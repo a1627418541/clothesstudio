@@ -1,0 +1,326 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Auth.js adapter models
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id             String    @id @default(cuid())
+  name           String?
+  email          String?   @unique
+  emailVerified  DateTime?
+  image          String?
+  role           UserRole  @default(USER)
+  accounts       Account[]
+  sessions       Session[]
+
+  profile           UserProfile?
+  privacySettings   UserPrivacySettings?
+  mediaAssets       MediaAsset[]
+  styleDiagnoses    StyleDiagnosis[]
+  generatedImages   GeneratedImage[]
+  aiJobs            AiJob[]
+  anonymousSessions AnonymousSession[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+// Anonymous sessions
+model AnonymousSession {
+  id          String   @id @default(cuid())
+  token       String   @unique
+  expiresAt   DateTime
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  mediaAssets     MediaAsset[]
+  styleDiagnoses  StyleDiagnosis[]
+  generatedImages GeneratedImage[]
+  aiJobs          AiJob[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// User profile
+model UserProfile {
+  id          String  @id @default(cuid())
+  userId      String  @unique
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  displayName String?
+  avatarUrl   String?
+  bio         String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Privacy settings
+model UserPrivacySettings {
+  id                   String  @id @default(cuid())
+  userId               String  @unique
+  user                 User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  allowAnalytics       Boolean @default(true)
+  allowMarketing       Boolean @default(false)
+  shareReportsPublicly Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Uploaded/generated media
+enum MediaAssetType {
+  UPLOAD
+  GENERATED
+}
+
+enum MediaAssetStatus {
+  UPLOADED
+  PROCESSING
+  READY
+  FAILED
+}
+
+model MediaAsset {
+  id                 String            @id @default(cuid())
+  userId             String?
+  anonymousSessionId String?
+
+  user               User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  anonymousSession   AnonymousSession? @relation(fields: [anonymousSessionId], references: [id], onDelete: SetNull)
+
+  type     MediaAssetType
+  bucket   String
+  key      String
+  url      String?
+  mimeType String
+  size     Int
+  width    Int?
+  height   Int?
+  status   MediaAssetStatus @default(UPLOADED)
+
+  diagnosisPhotos DiagnosisPhoto[]
+  generatedImages GeneratedImage[]
+
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+// Style diagnosis
+enum Gender {
+  MALE
+  FEMALE
+  NON_BINARY
+  PREFER_NOT_TO_SAY
+}
+
+enum StyleDiagnosisStatus {
+  DRAFT
+  SUBMITTED
+  PROCESSING
+  PREVIEW_READY
+  COMPLETED
+  FAILED
+  DELETED
+}
+
+model StyleDiagnosis {
+  id                 String               @id @default(cuid())
+  userId             String?
+  anonymousSessionId String?
+
+  user               User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
+  anonymousSession   AnonymousSession?    @relation(fields: [anonymousSessionId], references: [id], onDelete: SetNull)
+
+  gender       Gender?
+  age          Int?
+  heightCm     Int?
+  weightKg     Int?
+  bodyType     String?
+  faceShape    String?
+  vibeKeywords String[]
+  summary      String?
+  status       StyleDiagnosisStatus @default(DRAFT)
+
+  photos          DiagnosisPhoto[]
+  recommendations StyleRecommendation[]
+  generatedImages GeneratedImage[]
+  aiJobs          AiJob[]
+
+  deletedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Photos attached to a diagnosis
+enum DiagnosisPhotoRole {
+  FACE_FRONT
+  FACE_SIDE
+  FULL_BODY
+}
+
+enum PhotoQualityStatus {
+  PENDING
+  PASSED
+  FAILED
+}
+
+model DiagnosisPhoto {
+  id            String             @id @default(cuid())
+  diagnosisId   String
+  diagnosis     StyleDiagnosis     @relation(fields: [diagnosisId], references: [id], onDelete: Cascade)
+  mediaAssetId  String
+  mediaAsset    MediaAsset         @relation(fields: [mediaAssetId], references: [id], onDelete: Cascade)
+  role          DiagnosisPhotoRole
+  qualityStatus PhotoQualityStatus @default(PENDING)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([diagnosisId, role])
+}
+
+// AI-generated recommendations (placeholder for Sprint 2+)
+model StyleRecommendation {
+  id          String         @id @default(cuid())
+  diagnosisId String
+  diagnosis   StyleDiagnosis @relation(fields: [diagnosisId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  category    String?
+  priority    Int            @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// AI jobs
+enum AiJobType {
+  DIAGNOSIS_ANALYSIS
+  STYLE_GENERATION
+  LOOKBOOK_GENERATION
+  WARDROBE_ANALYSIS
+  OUTFIT_GENERATION
+  BODY_RETOUCH
+}
+
+enum AiJobStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+model AiJob {
+  id                 String            @id @default(cuid())
+  userId             String?
+  anonymousSessionId String?
+  diagnosisId        String?
+  promptVersionId    String?
+
+  user             User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  anonymousSession AnonymousSession? @relation(fields: [anonymousSessionId], references: [id], onDelete: SetNull)
+  diagnosis        StyleDiagnosis?   @relation(fields: [diagnosisId], references: [id], onDelete: Cascade)
+  promptVersion    PromptVersion?    @relation(fields: [promptVersionId], references: [id], onDelete: SetNull)
+
+  type         AiJobType
+  status       AiJobStatus @default(PENDING)
+  input        Json?
+  output       Json?
+  errorMessage String?
+
+  generatedImages GeneratedImage[]
+
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// Generated images
+model GeneratedImage {
+  id                 String            @id @default(cuid())
+  userId             String?
+  anonymousSessionId String?
+  diagnosisId        String?
+  aiJobId            String?
+  mediaAssetId       String?           @unique
+
+  user             User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  anonymousSession AnonymousSession? @relation(fields: [anonymousSessionId], references: [id], onDelete: SetNull)
+  diagnosis        StyleDiagnosis?   @relation(fields: [diagnosisId], references: [id], onDelete: Cascade)
+  aiJob            AiJob?            @relation(fields: [aiJobId], references: [id], onDelete: Cascade)
+  mediaAsset       MediaAsset?       @relation(fields: [mediaAssetId], references: [id], onDelete: SetNull)
+
+  prompt String?
+  seed   Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Prompt versions
+model PromptVersion {
+  id        String   @id @default(cuid())
+  name      String
+  version   Int
+  model     String?
+  prompt    String
+  isActive  Boolean  @default(false)
+
+  jobs AiJob[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([name, version])
+}
