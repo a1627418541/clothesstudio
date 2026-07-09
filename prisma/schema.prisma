@@ -158,8 +158,7 @@ model MediaAsset {
 enum Gender {
   MALE
   FEMALE
-  NON_BINARY
-  PREFER_NOT_TO_SAY
+  OTHER
 }
 
 enum StyleDiagnosisStatus {
@@ -180,15 +179,15 @@ model StyleDiagnosis {
   user               User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
   anonymousSession   AnonymousSession?    @relation(fields: [anonymousSessionId], references: [id], onDelete: SetNull)
 
-  gender       Gender?
-  age          Int?
-  heightCm     Int?
-  weightKg     Int?
+  gender       Gender
+  age          Int
+  heightCm     Int
+  weightKg     Int
   bodyType     String?
   faceShape    String?
   vibeKeywords String[]
   summary      String?
-  status       StyleDiagnosisStatus @default(DRAFT)
+  status       StyleDiagnosisStatus @default(SUBMITTED)
 
   photos          DiagnosisPhoto[]
   recommendations StyleRecommendation[]
@@ -230,16 +229,25 @@ model DiagnosisPhoto {
 
 // AI-generated recommendations (placeholder for Sprint 2+)
 model StyleRecommendation {
-  id          String         @id @default(cuid())
-  diagnosisId String
-  diagnosis   StyleDiagnosis @relation(fields: [diagnosisId], references: [id], onDelete: Cascade)
-  title       String
-  description String?
-  category    String?
-  priority    Int            @default(0)
+  id              String         @id @default(cuid())
+  diagnosisId     String
+  diagnosis       StyleDiagnosis @relation(fields: [diagnosisId], references: [id], onDelete: Cascade)
+
+  title           String
+  summary         String
+  clothingAdvice  String
+  hairstyleAdvice String
+  shoesAdvice     String
+  colorPalette    String[]
+  avoidTips       String[]
+
+  rank            Int            @default(0)
+  isPrimary       Boolean        @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([diagnosisId])
 }
 
 // AI jobs
