@@ -244,37 +244,37 @@ function WhatYouGet() {
           </div>
 
           <div className="mb-6">
-            <div className="flex items-center gap-2 mb-3">
-              <Palette size={18} className="text-blue-600" />
+            <div className="flex items-center gap-2 mb-3" id="color-palette-label">
+              <Palette size={18} className="text-blue-600" aria-hidden="true" />
               <span className="font-medium">Color palette</span>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <ul className="flex flex-wrap gap-2" aria-labelledby="color-palette-label">
               {colorPalette.map((color) => (
-                <span
+                <li
                   key={color}
                   className="px-3 py-1 rounded-full text-sm border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900"
                 >
                   {color}
-                </span>
+                </li>
               ))}
-            </div>
+            </ul>
           </div>
 
           <div>
-            <div className="flex items-center gap-2 mb-3">
-              <AlertCircle size={18} className="text-red-500" />
+            <div className="flex items-center gap-2 mb-3" id="avoid-label">
+              <AlertCircle size={18} className="text-red-500" aria-hidden="true" />
               <span className="font-medium">Avoid</span>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <ul className="flex flex-wrap gap-2" aria-labelledby="avoid-label">
               {avoidTips.map((tip) => (
-                <span
+                <li
                   key={tip}
                   className="px-3 py-1 rounded-full text-sm border border-red-100 dark:border-red-900/40 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300"
                 >
                   {tip}
-                </span>
+                </li>
               ))}
-            </div>
+            </ul>
           </div>
         </div>
       </div>
