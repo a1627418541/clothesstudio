@@ -71,6 +71,7 @@ export default async function DiagnosisDetailPage({ params }: PageProps) {
             <div key={photo.role}>
               <p className="text-sm font-medium mb-1">{photo.role}</p>
               {photo.url ? (
+                // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={photo.url}
                   alt={photo.role}
