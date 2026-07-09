@@ -1,9 +1,9 @@
 import { neonConfig } from "@neondatabase/serverless";
 import { PrismaNeon } from "@prisma/adapter-neon";
 import { PrismaClient } from "@prisma/client";
-import ws from "ws";
 
-neonConfig.webSocketConstructor = ws;
+// Use Neon HTTP fetch transport instead of WebSocket for better serverless compatibility.
+neonConfig.poolQueryViaFetch = true;
 
 const globalForPrisma = global as unknown as {
   prisma: PrismaClient | undefined;
