@@ -1,36 +1,108 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AI Personal Style Studio
 
-## Getting Started
+Sprint 1 infrastructure for an AI-powered personal style studio.
 
-First, run the development server:
+## What's Included
+
+- Next.js 15 + React 19 + TypeScript + Tailwind CSS
+- Prisma 7 ORM with Neon PostgreSQL
+- Auth.js v5 with optional Google OAuth and Resend Magic Link
+- Anonymous sessions via HTTP-only cookie
+- Cloudflare R2 server-side upload with MediaAsset persistence
+- Reserved Inngest and PostHog clients
+- Mock upload page for end-to-end verification
+
+## Prerequisites
+
+- Node.js 20+
+- A Neon PostgreSQL database
+- (Optional) Google OAuth credentials
+- (Optional) Resend API key and verified sender domain
+- (Optional) Cloudflare R2 bucket and credentials
+
+## Environment Setup
+
+Copy `.env.example` to `.env.local` and fill in the values:
+
+```bash
+cp .env.example .env.local
+```
+
+Required variables:
+
+- `DATABASE_URL` — Neon PostgreSQL connection string
+- `AUTH_SECRET` — random string (at least 32 characters)
+- `AUTH_URL` — `http://localhost:3000` for local development
+
+Optional variables:
+
+- `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET`
+- `AUTH_RESEND_KEY` / `EMAIL_FROM`
+- `CLOUDFLARE_R2_*` for uploads
+- `INNGEST_EVENT_KEY` / `INNGEST_SIGNING_KEY`
+- `NEXT_PUBLIC_POSTHOG_KEY` / `NEXT_PUBLIC_POSTHOG_HOST`
+
+## Database Setup
+
+```bash
+npx prisma generate
+npx prisma migrate dev --name init
+```
+
+## Run Development Server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Verification
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. `GET /api/health` → `{ "status": "ok" }`
+2. `GET /api/anonymous-session` → creates/resolves anonymous session
+3. `/upload` → upload three images (face front, face side, full body)
+4. Uploaded files appear in R2
+5. `MediaAsset` records appear in Neon
 
-## Learn More
+## Project Structure
 
-To learn more about Next.js, take a look at the following resources:
+```
+src/
+  app/
+    api/
+      anonymous-session/route.ts
+      auth/[...nextauth]/route.ts
+      health/route.ts
+      upload/route.ts
+    layout.tsx
+    page.tsx
+    upload/page.tsx
+  lib/
+    anonymous-session.ts
+    auth.ts
+    env.ts
+    inngest.ts
+    posthog.ts
+    prisma.ts
+    r2.ts
+prisma/
+  schema.prisma
+prisma.config.ts
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Important Notes
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- This project uses Prisma 7. The database connection URL is configured in `prisma.config.ts`, and the Prisma Client uses the Neon serverless driver adapter.
+- Auth.js providers are dynamically assembled from environment variables. Missing provider configuration will not crash the dev server.
+- Inngest and PostHog are reserved but inactive in Sprint 1.
 
-## Deploy on Vercel
+## Sprint 2 Plan
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- AI diagnosis pipeline (Inngest)
+- Style recommendations
+- Generated images
+- User dashboard
+- Anonymous-to-user data migration
+- Custom Resend email templates
+- PostHog event tracking
