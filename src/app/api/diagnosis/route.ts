@@ -4,8 +4,6 @@ import { prisma } from "@/lib/prisma";
 import { getAnonymousSessionByToken } from "@/lib/anonymous-session";
 import { diagnosisFormSchema } from "@/lib/validators/diagnosis";
 import { generateMockStyleRecommendation } from "@/lib/mock-style-engine";
-import { StyleDiagnosisStatus } from "@prisma/client";
-
 export async function POST(request: NextRequest) {
   try {
     const session = await auth();
@@ -72,7 +70,7 @@ export async function POST(request: NextRequest) {
           age,
           heightCm,
           weightKg,
-          status: StyleDiagnosisStatus.SUBMITTED,
+          status: "SUBMITTED",
         },
       });
 
@@ -101,7 +99,7 @@ export async function POST(request: NextRequest) {
 
       return tx.styleDiagnosis.update({
         where: { id: created.id },
-        data: { status: StyleDiagnosisStatus.PREVIEW_READY },
+        data: { status: "PREVIEW_READY" },
       });
     });
 
