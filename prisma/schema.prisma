@@ -227,6 +227,13 @@ model DiagnosisPhoto {
   @@unique([diagnosisId, role])
 }
 
+enum ImageStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
 // AI-generated recommendations (placeholder for Sprint 2+)
 model StyleRecommendation {
   id              String         @id @default(cuid())
@@ -244,6 +251,11 @@ model StyleRecommendation {
 
   rank            Int            @default(0)
   isPrimary       Boolean        @default(false)
+
+  previewImageUrl     String?
+  previewImageStatus  ImageStatus @default(PENDING)
+  previewImagePrompt  String?     @db.Text
+  previewImageError   String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -50,15 +50,34 @@ Optional variables:
 
 ### AI Provider (server-side only)
 
+Text diagnosis and style preview images use **separate provider configurations** so you can route text analysis through an OpenAI-compatible service (e.g. StarAPI) while sending image generation to an OpenAI official image endpoint.
+
+#### Text Diagnosis
+
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `AI_PROVIDER` | no | `openai` | `openai`, `mock`, or `gemini` (gemini not implemented). |
 | `OPENAI_API_KEY` | yes if provider=openai | — | Server-side only. |
+| `OPENAI_BASE_URL` | no | `https://api.openai.com/v1` | OpenAI-compatible endpoint for text diagnosis. |
 | `OPENAI_STYLE_MODEL` | no | `gpt-4o-mini` | Model used for diagnosis. |
 
 - Set `AI_PROVIDER=mock` for local development without OpenAI costs.
 - Set `AI_PROVIDER=openai` and provide `OPENAI_API_KEY` for real AI diagnosis.
 - If OpenAI fails, the system automatically falls back to the mock engine.
+
+#### Style Preview Images
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `STYLE_PREVIEW_PROVIDER` | no | `mock` | `openai` or `mock`. |
+| `STYLE_PREVIEW_MODEL` | no | `gpt-image-2` | Image model, e.g. `gpt-image-2`. |
+| `STYLE_PREVIEW_OPENAI_API_KEY` | yes if provider=openai | — | **Separate** from `OPENAI_API_KEY`. Server-side only. |
+| `STYLE_PREVIEW_OPENAI_BASE_URL` | no | `https://api.openai.com/v1` | OpenAI `/images/generations` endpoint. |
+| `STYLE_PREVIEW_FALLBACK_TO_MOCK` | no | `false` | Fallback to mock if image generation fails. Useful in development. |
+
+- Set `STYLE_PREVIEW_PROVIDER=mock` to show placeholder style images.
+- Set `STYLE_PREVIEW_PROVIDER=openai` and provide `STYLE_PREVIEW_OPENAI_API_KEY` for real style preview images.
+- The image provider never reuses `OPENAI_API_KEY`, avoiding accidental StarAPI-key usage on an OpenAI image endpoint.
 
 ## Database Setup
 

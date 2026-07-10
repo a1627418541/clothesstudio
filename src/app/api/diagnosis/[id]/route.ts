@@ -33,7 +33,7 @@ export async function GET(
       return NextResponse.json({ error: result.code }, { status });
     }
 
-    return NextResponse.json(result.diagnosis);
+    return NextResponse.json({ ok: true, diagnosis: result.diagnosis });
   } catch (error) {
     console.error("Diagnosis detail error:", error);
     const message = error instanceof Error ? error.message : "Failed to load diagnosis";
