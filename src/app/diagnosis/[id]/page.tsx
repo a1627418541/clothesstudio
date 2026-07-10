@@ -99,6 +99,7 @@ export default async function DiagnosisDetailPage({ params }: PageProps) {
         {primaryRec ? (
           <div className="space-y-2">
             <h3 className="text-xl font-semibold">{primaryRec.title}</h3>
+            {primaryRec.description && <p className="text-sm text-gray-600">{primaryRec.description}</p>}
             <p>{primaryRec.summary}</p>
             <p><strong>Clothing:</strong> {primaryRec.clothingAdvice}</p>
             <p><strong>Hair:</strong> {primaryRec.hairstyleAdvice}</p>
