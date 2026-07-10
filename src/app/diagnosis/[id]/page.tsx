@@ -47,7 +47,8 @@ export default async function DiagnosisDetailPage({ params }: PageProps) {
   }
 
   const diagnosis = result.diagnosis;
-  const rec = diagnosis.primaryRecommendation;
+  const primaryRec = diagnosis.recommendations.find((r) => r.isPrimary) ?? diagnosis.recommendations[0];
+  const alternatives = diagnosis.recommendations.filter((r) => !r.isPrimary);
   const isAnonymous = !userId;
 
   return (
@@ -62,6 +63,14 @@ export default async function DiagnosisDetailPage({ params }: PageProps) {
         <p>Height: {diagnosis.heightCm} cm</p>
         <p>Weight: {diagnosis.weightKg} kg</p>
         <p>Status: {diagnosis.status}</p>
+      </section>
+
+      <section className="mb-6 border rounded-lg p-4">
+        <h2 className="font-semibold mb-2">AI Analysis</h2>
+        <p><strong>Body Type:</strong> {diagnosis.bodyType ?? "N/A"}</p>
+        <p><strong>Face Shape:</strong> {diagnosis.faceShape ?? "N/A"}</p>
+        <p><strong>Vibe:</strong> {diagnosis.vibeKeywords.join(", ")}</p>
+        <p><strong>Summary:</strong> {diagnosis.summary ?? "N/A"}</p>
       </section>
 
       <section className="mb-6 border rounded-lg p-4">
@@ -87,18 +96,40 @@ export default async function DiagnosisDetailPage({ params }: PageProps) {
 
       <section className="mb-6 border rounded-lg p-4">
         <h2 className="font-semibold mb-2">Primary Recommendation</h2>
-        {rec ? (
+        {primaryRec ? (
           <div className="space-y-2">
-            <h3 className="text-xl font-semibold">{rec.title}</h3>
-            <p>{rec.summary}</p>
-            <p><strong>Clothing:</strong> {rec.clothingAdvice}</p>
-            <p><strong>Hair:</strong> {rec.hairstyleAdvice}</p>
-            <p><strong>Shoes:</strong> {rec.shoesAdvice}</p>
-            <p><strong>Colors:</strong> {rec.colorPalette.join(", ")}</p>
-            <p><strong>Avoid:</strong> {rec.avoidTips.join(", ")}</p>
+            <h3 className="text-xl font-semibold">{primaryRec.title}</h3>
+            <p>{primaryRec.summary}</p>
+            <p><strong>Clothing:</strong> {primaryRec.clothingAdvice}</p>
+            <p><strong>Hair:</strong> {primaryRec.hairstyleAdvice}</p>
+            <p><strong>Shoes:</strong> {primaryRec.shoesAdvice}</p>
+            <p><strong>Colors:</strong> {primaryRec.colorPalette.join(", ")}</p>
+            <p><strong>Avoid:</strong> {primaryRec.avoidTips.join(", ")}</p>
           </div>
         ) : (
           <p className="text-gray-500">No recommendation available.</p>
+        )}
+      </section>
+
+      <section className="mb-6 border rounded-lg p-4">
+        <h2 className="font-semibold mb-2">Alternative Recommendations</h2>
+        {alternatives.length > 0 ? (
+          <div className="space-y-4">
+            {alternatives.map((rec) => (
+              <div key={rec.rank} className="border rounded p-3">
+                <h3 className="text-lg font-semibold">{rec.title}</h3>
+                {rec.description && <p className="text-sm text-gray-600 mb-2">{rec.description}</p>}
+                <p>{rec.summary}</p>
+                <p><strong>Clothing:</strong> {rec.clothingAdvice}</p>
+                <p><strong>Hair:</strong> {rec.hairstyleAdvice}</p>
+                <p><strong>Shoes:</strong> {rec.shoesAdvice}</p>
+                <p><strong>Colors:</strong> {rec.colorPalette.join(", ")}</p>
+                <p><strong>Avoid:</strong> {rec.avoidTips.join(", ")}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-gray-500">No alternative recommendations available.</p>
         )}
       </section>
 

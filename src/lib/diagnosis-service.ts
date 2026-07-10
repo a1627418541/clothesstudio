@@ -8,21 +8,28 @@ export interface DiagnosisDetail {
   heightCm: number;
   weightKg: number;
   status: string;
+  bodyType: string | null;
+  faceShape: string | null;
+  vibeKeywords: string[];
+  summary: string | null;
   createdAt: Date;
   photos: {
     role: string;
     url: string | null;
     mimeType: string;
   }[];
-  primaryRecommendation: {
+  recommendations: {
+    rank: number;
+    isPrimary: boolean;
     title: string;
+    description: string | null;
     summary: string;
     clothingAdvice: string;
     hairstyleAdvice: string;
     shoesAdvice: string;
     colorPalette: string[];
     avoidTips: string[];
-  } | null;
+  }[];
 }
 
 const PHOTO_ORDER: DiagnosisPhotoRole[] = ["FACE_FRONT", "FACE_SIDE", "FULL_BODY"];
@@ -48,9 +55,7 @@ export async function getDiagnosisDetailForViewer({
         },
       },
       recommendations: {
-        where: { isPrimary: true },
         orderBy: { rank: "asc" },
-        take: 1,
       },
     },
   });
@@ -79,8 +84,6 @@ export async function getDiagnosisDetailForViewer({
     };
   });
 
-  const primary = diagnosis.recommendations[0] ?? null;
-
   const detail: DiagnosisDetail = {
     id: diagnosis.id,
     gender: diagnosis.gender,
@@ -88,19 +91,24 @@ export async function getDiagnosisDetailForViewer({
     heightCm: diagnosis.heightCm,
     weightKg: diagnosis.weightKg,
     status: diagnosis.status,
+    bodyType: diagnosis.bodyType,
+    faceShape: diagnosis.faceShape,
+    vibeKeywords: diagnosis.vibeKeywords,
+    summary: diagnosis.summary,
     createdAt: diagnosis.createdAt,
     photos: orderedPhotos,
-    primaryRecommendation: primary
-      ? {
-          title: primary.title,
-          summary: primary.summary,
-          clothingAdvice: primary.clothingAdvice,
-          hairstyleAdvice: primary.hairstyleAdvice,
-          shoesAdvice: primary.shoesAdvice,
-          colorPalette: primary.colorPalette,
-          avoidTips: primary.avoidTips,
-        }
-      : null,
+    recommendations: diagnosis.recommendations.map((rec) => ({
+      rank: rec.rank,
+      isPrimary: rec.isPrimary,
+      title: rec.title,
+      description: rec.description,
+      summary: rec.summary,
+      clothingAdvice: rec.clothingAdvice,
+      hairstyleAdvice: rec.hairstyleAdvice,
+      shoesAdvice: rec.shoesAdvice,
+      colorPalette: rec.colorPalette,
+      avoidTips: rec.avoidTips,
+    })),
   };
 
   return { ok: true, diagnosis: detail };
