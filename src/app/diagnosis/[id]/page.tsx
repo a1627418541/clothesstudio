@@ -3,9 +3,21 @@ import { auth } from "@/lib/auth";
 import { cookies } from "next/headers";
 import { getAnonymousSessionByToken } from "@/lib/anonymous-session";
 import { getDiagnosisDetailForViewer } from "@/lib/diagnosis-service";
+import { ArrowLeft, Calendar, Loader2 } from "lucide-react";
+import { RecommendationCard } from "@/components/diagnosis/recommendation-card";
+import { ReportSection } from "@/components/diagnosis/report-section";
 
 interface PageProps {
   params: Promise<{ id: string }>;
+}
+
+function InfoPill({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="rounded-xl border border-[#E8E6E1] bg-white px-4 py-3">
+      <p className="text-xs text-[#6B6B6B]">{label}</p>
+      <p className="mt-0.5 text-sm font-medium text-[#1A1A1A]">{value}</p>
+    </div>
+  );
 }
 
 export default async function DiagnosisDetailPage({ params }: PageProps) {
@@ -33,15 +45,20 @@ export default async function DiagnosisDetailPage({ params }: PageProps) {
   if (!result.ok) {
     const message =
       result.code === "NOT_FOUND"
-        ? "Diagnosis not found."
-        : "You do not have access to this diagnosis.";
+        ? "This report could not be found."
+        : "You do not have access to this report.";
     return (
-      <main className="max-w-2xl mx-auto p-6">
-        <h1 className="text-xl font-bold mb-4">Error</h1>
-        <p className="mb-4">{message}</p>
-        <Link href="/diagnosis" className="text-blue-600 hover:underline">
-          Back to diagnosis
-        </Link>
+      <main className="min-h-screen bg-[#FAFAF8] px-4 py-10">
+        <div className="mx-auto max-w-2xl rounded-3xl border border-[#E8E6E1] bg-white p-8 text-center shadow-sm">
+          <h1 className="mb-2 text-xl font-semibold text-[#1A1A1A]">Report Unavailable</h1>
+          <p className="mb-6 text-[#6B6B6B]">{message}</p>
+          <Link
+            href="/diagnosis"
+            className="inline-flex items-center gap-2 rounded-full bg-[#B85C4F] px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#9A4A3F]"
+          >
+            Start a New Diagnosis
+          </Link>
+        </div>
       </main>
     );
   }
@@ -51,102 +68,137 @@ export default async function DiagnosisDetailPage({ params }: PageProps) {
   const alternatives = diagnosis.recommendations.filter((r) => !r.isPrimary);
   const isAnonymous = !userId;
 
+  const createdAt = new Date(diagnosis.createdAt).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
   return (
-    <main className="max-w-2xl mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-4">Diagnosis Report</h1>
-
-      <section className="mb-6 border rounded-lg p-4">
-        <h2 className="font-semibold mb-2">Basic Info</h2>
-        <p>ID: {diagnosis.id}</p>
-        <p>Gender: {diagnosis.gender}</p>
-        <p>Age: {diagnosis.age}</p>
-        <p>Height: {diagnosis.heightCm} cm</p>
-        <p>Weight: {diagnosis.weightKg} kg</p>
-        <p>Status: {diagnosis.status}</p>
-      </section>
-
-      <section className="mb-6 border rounded-lg p-4">
-        <h2 className="font-semibold mb-2">AI Analysis</h2>
-        <p><strong>Body Type:</strong> {diagnosis.bodyType ?? "N/A"}</p>
-        <p><strong>Face Shape:</strong> {diagnosis.faceShape ?? "N/A"}</p>
-        <p><strong>Vibe:</strong> {diagnosis.vibeKeywords.join(", ")}</p>
-        <p><strong>Summary:</strong> {diagnosis.summary ?? "N/A"}</p>
-      </section>
-
-      <section className="mb-6 border rounded-lg p-4">
-        <h2 className="font-semibold mb-2">Photos</h2>
-        <div className="grid grid-cols-1 gap-4">
-          {diagnosis.photos.map((photo) => (
-            <div key={photo.role}>
-              <p className="text-sm font-medium mb-1">{photo.role}</p>
-              {photo.url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={photo.url}
-                  alt={photo.role}
-                  className="max-w-full h-auto rounded border"
-                />
-              ) : (
-                <p className="text-gray-500">No image available</p>
-              )}
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="mb-6 border rounded-lg p-4">
-        <h2 className="font-semibold mb-2">Primary Recommendation</h2>
-        {primaryRec ? (
-          <div className="space-y-2">
-            <h3 className="text-xl font-semibold">{primaryRec.title}</h3>
-            {primaryRec.description && <p className="text-sm text-gray-600">{primaryRec.description}</p>}
-            <p>{primaryRec.summary}</p>
-            <p><strong>Clothing:</strong> {primaryRec.clothingAdvice}</p>
-            <p><strong>Hair:</strong> {primaryRec.hairstyleAdvice}</p>
-            <p><strong>Shoes:</strong> {primaryRec.shoesAdvice}</p>
-            <p><strong>Colors:</strong> {primaryRec.colorPalette.join(", ")}</p>
-            <p><strong>Avoid:</strong> {primaryRec.avoidTips.join(", ")}</p>
+    <main className="min-h-screen bg-[#FAFAF8] px-4 py-6 md:py-10">
+      <div className="mx-auto max-w-3xl">
+        <header className="mb-6 md:mb-8">
+          <Link
+            href="/diagnosis"
+            className="mb-4 inline-flex items-center gap-1 text-sm font-medium text-[#6B6B6B] transition-colors hover:text-[#B85C4F]"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            New diagnosis
+          </Link>
+          <h1 className="text-2xl font-semibold text-[#1A1A1A] md:text-3xl">Your Personal Style Report</h1>
+          <div className="mt-2 flex items-center gap-2 text-sm text-[#6B6B6B]">
+            <Calendar className="h-4 w-4" />
+            {createdAt}
           </div>
-        ) : (
-          <p className="text-gray-500">No recommendation available.</p>
-        )}
-      </section>
+        </header>
 
-      <section className="mb-6 border rounded-lg p-4">
-        <h2 className="font-semibold mb-2">Alternative Recommendations</h2>
-        {alternatives.length > 0 ? (
-          <div className="space-y-4">
-            {alternatives.map((rec) => (
-              <div key={rec.rank} className="border rounded p-3">
-                <h3 className="text-lg font-semibold">{rec.title}</h3>
-                {rec.description && <p className="text-sm text-gray-600 mb-2">{rec.description}</p>}
-                <p>{rec.summary}</p>
-                <p><strong>Clothing:</strong> {rec.clothingAdvice}</p>
-                <p><strong>Hair:</strong> {rec.hairstyleAdvice}</p>
-                <p><strong>Shoes:</strong> {rec.shoesAdvice}</p>
-                <p><strong>Colors:</strong> {rec.colorPalette.join(", ")}</p>
-                <p><strong>Avoid:</strong> {rec.avoidTips.join(", ")}</p>
+        <section className="mb-8 rounded-3xl border border-[#E8E6E1] bg-white p-6 shadow-sm md:p-8">
+          <div className="mb-4 flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#FFF9F7] text-[#B85C4F]">
+              <Loader2 className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-[#6B6B6B]">AI Style Identity</p>
+              <h2 className="text-lg font-semibold text-[#1A1A1A] md:text-xl">{diagnosis.bodyType ?? "Custom Style"}</h2>
+            </div>
+          </div>
+
+          {diagnosis.summary && (
+            <p className="leading-relaxed text-[#6B6B6B]">{diagnosis.summary}</p>
+          )}
+
+          {diagnosis.vibeKeywords.length > 0 && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {diagnosis.vibeKeywords.map((keyword, index) => (
+                <span
+                  key={index}
+                  className="rounded-full bg-[#FAFAF8] px-3 py-1 text-xs font-medium text-[#1A1A1A]"
+                >
+                  {keyword}
+                </span>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <ReportSection title="Primary Recommendation">
+          {primaryRec ? (
+            <RecommendationCard recommendation={primaryRec} variant="primary" />
+          ) : (
+            <p className="text-[#6B6B6B]">No primary recommendation available.</p>
+          )}
+        </ReportSection>
+
+        {alternatives.length > 0 && (
+          <ReportSection title="Alternative Recommendations">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              {alternatives.map((rec, index) => (
+                <RecommendationCard
+                  key={rec.rank}
+                  recommendation={rec}
+                  variant="alternative"
+                  rank={index + 1}
+                />
+              ))}
+            </div>
+          </ReportSection>
+        )}
+
+        <ReportSection title="Your Photos">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            {diagnosis.photos.map((photo) => (
+              <div
+                key={photo.role}
+                className="overflow-hidden rounded-2xl border border-[#E8E6E1] bg-white"
+              >
+                {photo.url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={photo.url}
+                    alt={photo.role}
+                    className="aspect-square w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex aspect-square items-center justify-center bg-[#FAFAF8] text-sm text-[#6B6B6B]">
+                    No image
+                  </div>
+                )}
+                <div className="p-3">
+                  <p className="text-xs font-medium text-[#6B6B6B]">
+                    {photo.role.replace("_", " ")}
+                  </p>
+                </div>
               </div>
             ))}
           </div>
-        ) : (
-          <p className="text-gray-500">No alternative recommendations available.</p>
+        </ReportSection>
+
+        <ReportSection title="Basic Information">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <InfoPill label="Gender" value={diagnosis.gender} />
+            <InfoPill label="Age" value={`${diagnosis.age} yrs`} />
+            <InfoPill label="Height" value={`${diagnosis.heightCm} cm`} />
+            <InfoPill label="Weight" value={`${diagnosis.weightKg} kg`} />
+          </div>
+        </ReportSection>
+
+        {isAnonymous && (
+          <section className="mb-8 rounded-2xl border border-[#E8E6E1] bg-[#FFF9F7] p-4 text-sm text-[#1A1A1A]">
+            <p className="font-medium">Save your report for later</p>
+            <p className="mt-1 text-[#6B6B6B]">
+              Anonymous reports are tied to this browser session. Sign in to keep this report forever.
+            </p>
+          </section>
         )}
-      </section>
 
-      {isAnonymous && (
-        <section className="border rounded-lg p-4 bg-yellow-50">
-          <p>
-            <strong>Login to view your full report later.</strong>{" "}
-            Anonymous reports are tied to this browser session.
-          </p>
-        </section>
-      )}
-
-      <div className="mt-6">
-        <Link href="/diagnosis" className="text-blue-600 hover:underline">
-          Start a new diagnosis
-        </Link>
+        <div className="flex justify-center pb-8">
+          <Link
+            href="/diagnosis"
+            className="inline-flex items-center justify-center gap-2 rounded-full bg-[#B85C4F] px-8 py-3 text-sm font-medium text-white transition-colors hover:bg-[#9A4A3F]"
+          >
+            Start a New Diagnosis
+          </Link>
+        </div>
       </div>
     </main>
   );

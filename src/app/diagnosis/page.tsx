@@ -2,21 +2,25 @@
 
 import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
+import { ArrowRight, Check, ChevronLeft, Loader2, Sparkles, User } from "lucide-react";
 import { diagnosisFormSchema, DiagnosisFormInput } from "@/lib/validators/diagnosis";
 import { ZodError } from "zod";
+import { PhotoUploadCard } from "@/components/diagnosis/photo-upload-card";
 
 const ROLES = [
-  { key: "FACE_FRONT" as const, label: "Front face photo" },
-  { key: "FACE_SIDE" as const, label: "Side face photo" },
-  { key: "FULL_BODY" as const, label: "Full body photo" },
-];
+  { key: "FACE_FRONT" as const, label: "Front Face" },
+  { key: "FACE_SIDE" as const, label: "Side Face" },
+  { key: "FULL_BODY" as const, label: "Full Body" },
+] as const;
 
 type UploadStatus = "idle" | "uploading" | "uploaded" | "error";
 type SessionStatus = "initializing" | "ready" | "error";
+type Step = "upload" | "info";
 
 interface UploadState {
   status: UploadStatus;
   assetId: string | null;
+  previewUrl: string | null;
   error: string | null;
 }
 
@@ -35,10 +39,11 @@ interface RecommendationResult {
 }
 
 export default function DiagnosisPage() {
+  const [step, setStep] = useState<Step>("upload");
   const [uploads, setUploads] = useState<Record<string, UploadState>>({
-    FACE_FRONT: { status: "idle", assetId: null, error: null },
-    FACE_SIDE: { status: "idle", assetId: null, error: null },
-    FULL_BODY: { status: "idle", assetId: null, error: null },
+    FACE_FRONT: { status: "idle", assetId: null, previewUrl: null, error: null },
+    FACE_SIDE: { status: "idle", assetId: null, previewUrl: null, error: null },
+    FULL_BODY: { status: "idle", assetId: null, previewUrl: null, error: null },
   });
 
   const [form, setForm] = useState({
@@ -77,16 +82,26 @@ export default function DiagnosisPage() {
     return ids;
   }, [uploads]);
 
+  const photosComplete = Object.keys(photoAssetIds).length === ROLES.length;
+
   async function handleFileSelect(role: string, file: File) {
     if (sessionStatus !== "ready") {
       setUploads((prev) => ({
         ...prev,
-        [role]: { status: "error", assetId: null, error: "Session not ready. Please wait." },
+        [role]: {
+          ...prev[role],
+          status: "error",
+          error: "Session not ready. Please wait.",
+        },
       }));
       return;
     }
 
-    setUploads((prev) => ({ ...prev, [role]: { status: "uploading", assetId: null, error: null } }));
+    const previewUrl = URL.createObjectURL(file);
+    setUploads((prev) => ({
+      ...prev,
+      [role]: { status: "uploading", assetId: null, previewUrl, error: null },
+    }));
 
     const formData = new FormData();
     formData.append("file", file);
@@ -100,10 +115,16 @@ export default function DiagnosisPage() {
         throw new Error(data.error || "Upload failed");
       }
 
-      setUploads((prev) => ({ ...prev, [role]: { status: "uploaded", assetId: data.id, error: null } }));
+      setUploads((prev) => ({
+        ...prev,
+        [role]: { status: "uploaded", assetId: data.id, previewUrl, error: null },
+      }));
     } catch (error) {
       const message = error instanceof Error ? error.message : "Upload failed";
-      setUploads((prev) => ({ ...prev, [role]: { status: "error", assetId: null, error: message } }));
+      setUploads((prev) => ({
+        ...prev,
+        [role]: { status: "error", assetId: null, previewUrl, error: message },
+      }));
     }
   }
 
@@ -164,7 +185,7 @@ export default function DiagnosisPage() {
 
   const canSubmit =
     sessionStatus === "ready" &&
-    Object.keys(photoAssetIds).length === ROLES.length &&
+    photosComplete &&
     form.gender &&
     form.age &&
     form.heightCm &&
@@ -173,157 +194,268 @@ export default function DiagnosisPage() {
   if (result) {
     const rec = result.primaryRecommendation;
     return (
-      <main className="max-w-2xl mx-auto p-6">
-        <h1 className="text-2xl font-bold mb-4">Your Primary Style Preview</h1>
-        <div className="space-y-4 border rounded-lg p-4">
-          <h2 className="text-xl font-semibold">{rec.title}</h2>
-          <p>{rec.summary}</p>
-          <p><strong>Clothing:</strong> {rec.clothingAdvice}</p>
-          <p><strong>Hair:</strong> {rec.hairstyleAdvice}</p>
-          <p><strong>Shoes:</strong> {rec.shoesAdvice}</p>
-          <p><strong>Colors:</strong> {rec.colorPalette.join(", ")}</p>
-          <p><strong>Avoid:</strong> {rec.avoidTips.join(", ")}</p>
-        </div>
-        <div className="mt-6 flex gap-4">
+      <main className="min-h-screen bg-[#FAFAF8] px-4 py-10 md:px-6">
+        <div className="mx-auto max-w-2xl rounded-3xl border border-[#E8E6E1] bg-white p-6 text-center shadow-sm md:p-10">
+          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-[#FFF9F7] text-[#B85C4F]">
+            <Sparkles className="h-8 w-8" />
+          </div>
+          <h1 className="mb-2 text-2xl font-semibold text-[#1A1A1A] md:text-3xl">Your Style Report is Ready</h1>
+          <p className="mb-8 text-[#6B6B6B]">
+            We&apos;ve analyzed your photos and created a personalized style diagnosis.
+          </p>
+          <div className="mb-8 space-y-3 rounded-2xl bg-[#FAFAF8] p-5 text-left">
+            <h2 className="text-lg font-semibold text-[#1A1A1A]">{rec.title}</h2>
+            <p className="text-sm text-[#6B6B6B]">{rec.summary}</p>
+          </div>
           <Link
             href={`/diagnosis/${result.id}`}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            className="inline-flex items-center justify-center gap-2 rounded-full bg-[#B85C4F] px-8 py-3 text-sm font-medium text-white transition-colors hover:bg-[#9A4A3F]"
           >
-            View Details
+            View Full Report
+            <ArrowRight className="h-4 w-4" />
           </Link>
-          <button
-            onClick={() => window.location.reload()}
-            className="px-4 py-2 border rounded hover:bg-gray-50"
-          >
-            Start Over
-          </button>
         </div>
       </main>
     );
   }
 
   return (
-    <main className="max-w-2xl mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-6">Style Diagnosis</h1>
-
-      {sessionStatus === "error" && (
-        <div className="mb-6 p-4 border border-red-300 bg-red-50 rounded text-red-700">
-          Failed to initialize anonymous session. Please refresh.
-        </div>
-      )}
-
-      {sessionStatus === "initializing" && (
-        <div className="mb-6 p-4 border border-blue-300 bg-blue-50 rounded text-blue-700">
-          Initializing session...
-        </div>
-      )}
-
-      <section className="space-y-4 mb-8">
-        {ROLES.map(({ key, label }) => {
-          const upload = uploads[key];
-          return (
-            <div key={key} className="border rounded-lg p-4">
-              <label className="block font-medium mb-2">{label}</label>
-              <input
-                type="file"
-                accept="image/*"
-                disabled={sessionStatus !== "ready"}
-                className="block w-full text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleFileSelect(key, file);
-                }}
-              />
-              <p className="mt-2 text-sm">
-                Status:{" "}
-                <span
-                  className={
-                    upload.status === "error"
-                      ? "text-red-600"
-                      : upload.status === "uploaded"
-                      ? "text-green-600"
-                      : "text-gray-600"
-                  }
-                >
-                  {upload.status}
-                </span>
-              </p>
-              {upload.error && <p className="text-sm text-red-600 mt-1">{upload.error}</p>}
-            </div>
-          );
-        })}
-        {formErrors.photoAssetIds && <p className="text-sm text-red-600">{formErrors.photoAssetIds}</p>}
-      </section>
-
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block font-medium mb-1">Gender</label>
-          <select
-            value={form.gender}
-            onChange={(e) => setForm({ ...form, gender: e.target.value })}
-            className="w-full border rounded p-2"
-            required
+    <main className="min-h-screen bg-[#FAFAF8] px-4 py-6 md:py-10">
+      <div className="mx-auto max-w-3xl">
+        <header className="mb-8 flex items-center gap-3 md:mb-10">
+          <Link
+            href="/"
+            className="flex h-10 w-10 items-center justify-center rounded-full text-[#6B6B6B] transition-colors hover:bg-white hover:text-[#1A1A1A]"
           >
-            <option value="">Select gender</option>
-            <option value="MALE">Male</option>
-            <option value="FEMALE">Female</option>
-            <option value="OTHER">Other</option>
-          </select>
-          {formErrors.gender && <p className="text-sm text-red-600 mt-1">{formErrors.gender}</p>}
+            <ChevronLeft className="h-5 w-5" />
+          </Link>
+          <div>
+            <h1 className="text-xl font-semibold text-[#1A1A1A] md:text-2xl">AI Style Studio</h1>
+            <p className="text-xs text-[#6B6B6B] md:text-sm">Personal style diagnosis powered by AI</p>
+          </div>
+        </header>
+
+        <div className="mb-8 flex items-center justify-center gap-2 text-sm">
+          {[
+            { id: "upload", label: "Upload Photos" },
+            { id: "info", label: "Your Profile" },
+            { id: "report", label: "Your Report" },
+          ].map((s, index) => {
+            const isActive = step === s.id || (s.id === "upload" && step === "upload") || (s.id === "info" && step === "info");
+            const isPast =
+              (s.id === "upload" && step === "info") ||
+              (s.id === "upload" && result) ||
+              (s.id === "info" && result);
+            return (
+              <div key={s.id} className="flex items-center gap-2">
+                <span
+                  className={[
+                    "flex h-7 w-7 items-center justify-center rounded-full text-xs font-medium",
+                    isActive
+                      ? "bg-[#B85C4F] text-white"
+                      : isPast
+                      ? "bg-[#2E7D5A] text-white"
+                      : "bg-[#E8E6E1] text-[#6B6B6B]",
+                  ].join(" ")}
+                >
+                  {isPast ? <Check className="h-3.5 w-3.5" /> : index + 1}
+                </span>
+                <span
+                  className={[
+                    "hidden font-medium md:inline",
+                    isActive || isPast ? "text-[#1A1A1A]" : "text-[#6B6B6B]",
+                  ].join(" ")}
+                >
+                  {s.label}
+                </span>
+              </div>
+            );
+          })}
         </div>
 
-        <div>
-          <label className="block font-medium mb-1">Age</label>
-          <input
-            type="number"
-            min={13}
-            max={80}
-            value={form.age}
-            onChange={(e) => setForm({ ...form, age: e.target.value })}
-            className="w-full border rounded p-2"
-            required
-          />
-          {formErrors.age && <p className="text-sm text-red-600 mt-1">{formErrors.age}</p>}
-        </div>
+        {sessionStatus === "error" && (
+          <div className="mb-6 rounded-2xl border border-[#C73E3E]/30 bg-[#FEF6F6] p-4 text-center text-sm text-[#C73E3E]">
+            Failed to initialize anonymous session. Please refresh.
+          </div>
+        )}
 
-        <div>
-          <label className="block font-medium mb-1">Height (cm)</label>
-          <input
-            type="number"
-            min={120}
-            max={230}
-            value={form.heightCm}
-            onChange={(e) => setForm({ ...form, heightCm: e.target.value })}
-            className="w-full border rounded p-2"
-            required
-          />
-          {formErrors.heightCm && <p className="text-sm text-red-600 mt-1">{formErrors.heightCm}</p>}
-        </div>
+        {sessionStatus === "initializing" && (
+          <div className="mb-6 flex items-center justify-center gap-2 rounded-2xl border border-[#E8E6E1] bg-white p-4 text-sm text-[#6B6B6B]">
+            <Loader2 className="h-4 w-4 animate-spin text-[#B85C4F]" />
+            Initializing session...
+          </div>
+        )}
 
-        <div>
-          <label className="block font-medium mb-1">Weight (kg)</label>
-          <input
-            type="number"
-            min={30}
-            max={200}
-            value={form.weightKg}
-            onChange={(e) => setForm({ ...form, weightKg: e.target.value })}
-            className="w-full border rounded p-2"
-            required
-          />
-          {formErrors.weightKg && <p className="text-sm text-red-600 mt-1">{formErrors.weightKg}</p>}
-        </div>
+        {step === "upload" ? (
+          <section className="rounded-3xl border border-[#E8E6E1] bg-white p-5 shadow-sm md:p-8">
+            <div className="mb-6">
+              <h2 className="text-lg font-semibold text-[#1A1A1A] md:text-xl">Upload your photos</h2>
+              <p className="mt-1 text-sm text-[#6B6B6B]">
+                We need three photos to build an accurate style profile.
+              </p>
+            </div>
 
-        {submitError && <p className="text-red-600">{submitError}</p>}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              {ROLES.map(({ key, label }) => (
+                <PhotoUploadCard
+                  key={key}
+                  role={key}
+                  label={label}
+                  status={uploads[key].status}
+                  previewUrl={uploads[key].previewUrl}
+                  error={uploads[key].error}
+                  disabled={sessionStatus !== "ready"}
+                  onFileSelect={(file) => handleFileSelect(key, file)}
+                  onRetry={() => {
+                    setUploads((prev) => ({
+                      ...prev,
+                      [key]: { status: "idle", assetId: null, previewUrl: null, error: null },
+                    }));
+                  }}
+                />
+              ))}
+            </div>
 
-        <button
-          type="submit"
-          disabled={!canSubmit || submitting}
-          className="px-6 py-2 bg-blue-600 text-white rounded disabled:opacity-50 hover:bg-blue-700"
-        >
-          {submitting ? "Submitting..." : "Submit Diagnosis"}
-        </button>
-      </form>
+            {formErrors.photoAssetIds && (
+              <p className="mt-4 text-sm text-[#C73E3E]">{formErrors.photoAssetIds}</p>
+            )}
+
+            <div className="mt-8 flex justify-end">
+              <button
+                type="button"
+                disabled={!photosComplete}
+                onClick={() => setStep("info")}
+                className="inline-flex items-center gap-2 rounded-full bg-[#B85C4F] px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#9A4A3F] disabled:cursor-not-allowed disabled:bg-[#E8E6E1] disabled:text-[#9B9B9B]"
+              >
+                Continue
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            </div>
+          </section>
+        ) : (
+          <section className="rounded-3xl border border-[#E8E6E1] bg-white p-5 shadow-sm md:p-8">
+            <div className="mb-6">
+              <button
+                type="button"
+                onClick={() => setStep("upload")}
+                className="mb-3 text-sm font-medium text-[#6B6B6B] hover:text-[#B85C4F]"
+              >
+                ← Back to photos
+              </button>
+              <h2 className="text-lg font-semibold text-[#1A1A1A] md:text-xl">Tell us about yourself</h2>
+              <p className="mt-1 text-sm text-[#6B6B6B]">
+                This helps us tailor the recommendations to your body and lifestyle.
+              </p>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-[#1A1A1A]">Gender</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { value: "MALE", label: "Male" },
+                      { value: "FEMALE", label: "Female" },
+                      { value: "OTHER", label: "Other" },
+                    ].map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setForm({ ...form, gender: option.value })}
+                        className={[
+                          "rounded-xl border px-3 py-2.5 text-sm font-medium transition-colors",
+                          form.gender === option.value
+                            ? "border-[#B85C4F] bg-[#FFF9F7] text-[#B85C4F]"
+                            : "border-[#E8E6E1] bg-white text-[#1A1A1A] hover:border-[#B85C4F]",
+                        ].join(" ")}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                  {formErrors.gender && <p className="mt-1.5 text-sm text-[#C73E3E]">{formErrors.gender}</p>}
+                </div>
+
+                <div>
+                  <label htmlFor="age" className="mb-2 block text-sm font-medium text-[#1A1A1A]">Age</label>
+                  <div className="relative">
+                    <input
+                      id="age"
+                      type="number"
+                      min={13}
+                      max={80}
+                      value={form.age}
+                      onChange={(e) => setForm({ ...form, age: e.target.value })}
+                      className="w-full rounded-xl border border-[#E8E6E1] bg-white px-4 py-2.5 text-sm text-[#1A1A1A] outline-none transition-colors focus:border-[#B85C4F]"
+                      placeholder="25"
+                    />
+                    <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm text-[#6B6B6B]">yrs</span>
+                  </div>
+                  {formErrors.age && <p className="mt-1.5 text-sm text-[#C73E3E]">{formErrors.age}</p>}
+                </div>
+
+                <div>
+                  <label htmlFor="height" className="mb-2 block text-sm font-medium text-[#1A1A1A]">Height</label>
+                  <div className="relative">
+                    <User className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6B6B6B]" />
+                    <input
+                      id="height"
+                      type="number"
+                      min={120}
+                      max={230}
+                      value={form.heightCm}
+                      onChange={(e) => setForm({ ...form, heightCm: e.target.value })}
+                      className="w-full rounded-xl border border-[#E8E6E1] bg-white py-2.5 pl-10 pr-12 text-sm text-[#1A1A1A] outline-none transition-colors focus:border-[#B85C4F]"
+                      placeholder="170"
+                    />
+                    <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm text-[#6B6B6B]">cm</span>
+                  </div>
+                  {formErrors.heightCm && <p className="mt-1.5 text-sm text-[#C73E3E]">{formErrors.heightCm}</p>}
+                </div>
+
+                <div>
+                  <label htmlFor="weight" className="mb-2 block text-sm font-medium text-[#1A1A1A]">Weight</label>
+                  <div className="relative">
+                    <input
+                      id="weight"
+                      type="number"
+                      min={30}
+                      max={200}
+                      value={form.weightKg}
+                      onChange={(e) => setForm({ ...form, weightKg: e.target.value })}
+                      className="w-full rounded-xl border border-[#E8E6E1] bg-white px-4 py-2.5 pr-12 text-sm text-[#1A1A1A] outline-none transition-colors focus:border-[#B85C4F]"
+                      placeholder="65"
+                    />
+                    <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm text-[#6B6B6B]">kg</span>
+                  </div>
+                  {formErrors.weightKg && <p className="mt-1.5 text-sm text-[#C73E3E]">{formErrors.weightKg}</p>}
+                </div>
+              </div>
+
+              {submitError && (
+                <div className="rounded-xl border border-[#C73E3E]/30 bg-[#FEF6F6] p-4 text-sm text-[#C73E3E]">
+                  {submitError}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={!canSubmit || submitting}
+                className="flex w-full items-center justify-center gap-2 rounded-full bg-[#B85C4F] px-6 py-3.5 text-sm font-medium text-white transition-colors hover:bg-[#9A4A3F] disabled:cursor-not-allowed disabled:bg-[#E8E6E1] disabled:text-[#9B9B9B]"
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Analyzing your style...
+                  </>
+                ) : (
+                  <>Generate My Style Report</>
+                )}
+              </button>
+            </form>
+          </section>
+        )}
+      </div>
     </main>
   );
 }
