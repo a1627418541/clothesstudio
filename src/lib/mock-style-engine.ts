@@ -7,12 +7,21 @@ export interface MockStyleInput {
 
 export interface MockStyleRecommendation {
   title: string;
+  description: string;
   summary: string;
   clothingAdvice: string;
   hairstyleAdvice: string;
   shoesAdvice: string;
   colorPalette: string[];
   avoidTips: string[];
+}
+
+export interface MockStyleRecommendationsOutput {
+  bodyType: string;
+  faceShape: string;
+  vibeKeywords: string[];
+  summary: string;
+  recommendations: MockStyleRecommendation[];
 }
 
 const PALETTES: Record<MockStyleInput["gender"], string[]> = {
@@ -43,6 +52,7 @@ function baseStyle(gender: MockStyleInput["gender"]) {
     case "MALE":
       return {
         title: "Clean Casual / 干净休闲",
+        description: "An easy-to-wear everyday style built on simple silhouettes and neutral colors. / 基于简洁廓形和中性色的易穿日常风格。",
         summary:
           "A relaxed but polished everyday look that keeps silhouettes simple and fabrics breathable. / 轻松但精致的日常造型，剪裁简洁、面料透气。",
         clothingAdvice: {
@@ -57,6 +67,7 @@ function baseStyle(gender: MockStyleInput["gender"]) {
     case "FEMALE":
       return {
         title: "Soft Minimal / 柔和极简",
+        description: "An easy-to-wear everyday style built on simple silhouettes and neutral colors. / 基于简洁廓形和中性色的易穿日常风格。",
         summary:
           "Gentle tones and flowing lines create a calm, modern femininity without excess detail. / 柔和色调与流畅线条，打造不过分装饰的 calm 现代女性气质。",
         clothingAdvice: {
@@ -71,6 +82,7 @@ function baseStyle(gender: MockStyleInput["gender"]) {
     case "OTHER":
       return {
         title: "Gender Neutral / 无性别风",
+        description: "An easy-to-wear everyday style built on simple silhouettes and neutral colors. / 基于简洁廓形和中性色的易穿日常风格。",
         summary:
           "Balanced silhouettes and muted palettes that sit outside traditional gendered dressing. / 平衡廓形与低饱和配色，跳出传统性别化着装框架。",
         clothingAdvice: {
@@ -131,5 +143,40 @@ export function generateMockStyleRecommendation(input: MockStyleInput): MockStyl
     clothingAdvice: joinBilingual(style.clothingAdvice, notes),
     colorPalette: PALETTES[input.gender],
     avoidTips: AVOID_TIPS[input.gender],
+  };
+}
+
+function alternativeStyle(
+  gender: MockStyleInput["gender"],
+  variant: "polished" | "relaxed"
+): MockStyleRecommendation {
+  const base = generateMockStyleRecommendation({ gender, age: 30, heightCm: 170, weightKg: 65 });
+  if (variant === "polished") {
+    return {
+      ...base,
+      title: gender === "FEMALE" ? "Polished Commuter / 精致通勤" : "Smart Casual / 精明休闲",
+      summary: "A refined, office-ready direction with tailored lines and neutral palettes. / 精致、适合办公的方向，剪裁利落、配色中性。",
+    };
+  }
+  return {
+    ...base,
+    title: gender === "FEMALE" ? "Relaxed Personal / 随性自我" : "Laid-back Utility / 休闲机能",
+    summary: "A comfortable, expressive direction that prioritizes ease and personal taste. / 舒适、富有个性的方向，强调轻松与个人喜好。",
+  };
+}
+
+export function generateMockStyleRecommendations(
+  input: MockStyleInput
+): MockStyleRecommendationsOutput {
+  const primary = generateMockStyleRecommendation(input);
+  const alt1 = alternativeStyle(input.gender, "polished");
+  const alt2 = alternativeStyle(input.gender, "relaxed");
+
+  return {
+    bodyType: input.gender === "FEMALE" ? "hourglass" : "rectangle",
+    faceShape: "oval",
+    vibeKeywords: ["clean", "minimal", "balanced", "modern", "effortless"],
+    summary: "Overall direction leans toward clean, balanced silhouettes with a modern, effortless feel. / 整体方向偏向干净、平衡的廓形，呈现现代、不费力的感觉。",
+    recommendations: [primary, alt1, alt2],
   };
 }

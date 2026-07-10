@@ -48,6 +48,18 @@ Optional variables:
 - `INNGEST_EVENT_KEY` / `INNGEST_SIGNING_KEY`
 - `NEXT_PUBLIC_POSTHOG_KEY` / `NEXT_PUBLIC_POSTHOG_HOST`
 
+### AI Provider (server-side only)
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `AI_PROVIDER` | no | `openai` | `openai`, `mock`, or `gemini` (gemini not implemented). |
+| `OPENAI_API_KEY` | yes if provider=openai | — | Server-side only. |
+| `OPENAI_STYLE_MODEL` | no | `gpt-4o-mini` | Model used for diagnosis. |
+
+- Set `AI_PROVIDER=mock` for local development without OpenAI costs.
+- Set `AI_PROVIDER=openai` and provide `OPENAI_API_KEY` for real AI diagnosis.
+- If OpenAI fails, the system automatically falls back to the mock engine.
+
 ## Database Setup
 
 ```bash
