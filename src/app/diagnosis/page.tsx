@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { diagnosisFormSchema, DiagnosisFormInput } from "@/lib/validators/diagnosis";
 import { ZodError } from "zod";
@@ -12,6 +12,7 @@ const ROLES = [
 ];
 
 type UploadStatus = "idle" | "uploading" | "uploaded" | "error";
+type SessionStatus = "initializing" | "ready" | "error";
 
 interface UploadState {
   status: UploadStatus;
@@ -51,6 +52,20 @@ export default function DiagnosisPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<RecommendationResult | null>(null);
+  const [sessionStatus, setSessionStatus] = useState<SessionStatus>("initializing");
+
+  useEffect(() => {
+    fetch("/api/anonymous-session", { method: "GET", credentials: "include" })
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`Session initialization failed: ${res.status}`);
+        }
+        setSessionStatus("ready");
+      })
+      .catch(() => {
+        setSessionStatus("error");
+      });
+  }, []);
 
   const photoAssetIds = useMemo(() => {
     const ids: Record<string, string> = {};
@@ -63,6 +78,14 @@ export default function DiagnosisPage() {
   }, [uploads]);
 
   async function handleFileSelect(role: string, file: File) {
+    if (sessionStatus !== "ready") {
+      setUploads((prev) => ({
+        ...prev,
+        [role]: { status: "error", assetId: null, error: "Session not ready. Please wait." },
+      }));
+      return;
+    }
+
     setUploads((prev) => ({ ...prev, [role]: { status: "uploading", assetId: null, error: null } }));
 
     const formData = new FormData();
@@ -140,6 +163,7 @@ export default function DiagnosisPage() {
   }
 
   const canSubmit =
+    sessionStatus === "ready" &&
     Object.keys(photoAssetIds).length === ROLES.length &&
     form.gender &&
     form.age &&
@@ -182,6 +206,18 @@ export default function DiagnosisPage() {
     <main className="max-w-2xl mx-auto p-6">
       <h1 className="text-2xl font-bold mb-6">Style Diagnosis</h1>
 
+      {sessionStatus === "error" && (
+        <div className="mb-6 p-4 border border-red-300 bg-red-50 rounded text-red-700">
+          Failed to initialize anonymous session. Please refresh.
+        </div>
+      )}
+
+      {sessionStatus === "initializing" && (
+        <div className="mb-6 p-4 border border-blue-300 bg-blue-50 rounded text-blue-700">
+          Initializing session...
+        </div>
+      )}
+
       <section className="space-y-4 mb-8">
         {ROLES.map(({ key, label }) => {
           const upload = uploads[key];
@@ -191,7 +227,8 @@ export default function DiagnosisPage() {
               <input
                 type="file"
                 accept="image/*"
-                className="block w-full text-sm"
+                disabled={sessionStatus !== "ready"}
+                className="block w-full text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) handleFileSelect(key, file);
