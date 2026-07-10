@@ -99,7 +99,7 @@ export class StyleAiService {
 
   async finalizeJob(
     jobId: string,
-    status: "COMPLETED" | "FAILED",
+    status: "COMPLETED" | "FAILED" | "PERSISTENCE_FAILED",
     output: StyleAiOutput,
     errorMessage: string | null
   ): Promise<void> {

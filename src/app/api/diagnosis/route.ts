@@ -148,12 +148,16 @@ export async function POST(request: NextRequest) {
         });
       });
     } catch (error) {
-      await styleAiService.finalizeJob(
-        jobId,
-        "FAILED",
-        output,
-        errorMessage ?? "Diagnosis persistence failed"
-      );
+      try {
+        await styleAiService.finalizeJob(
+          jobId,
+          "PERSISTENCE_FAILED",
+          output,
+          errorMessage ?? "Diagnosis persistence failed"
+        );
+      } catch (finalizeError) {
+        console.error("Failed to finalize AI job after persistence failure:", finalizeError);
+      }
       throw error;
     }
 
