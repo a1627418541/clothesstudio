@@ -23,7 +23,9 @@ export class StyleAiService {
     this.providerName = process.env.AI_PROVIDER?.toLowerCase() || "openai";
   }
 
-  async analyze(input: StyleAiInput): Promise<StyleAiOutput> {
+  async analyze(
+    input: StyleAiInput
+  ): Promise<{ output: StyleAiOutput; jobId: string; errorMessage: string | null }> {
     const promptVersion = await ensurePromptVersion({
       name: STYLE_DIAGNOSIS_PROMPT_NAME,
       version: STYLE_DIAGNOSIS_PROMPT_VERSION,
@@ -58,7 +60,6 @@ export class StyleAiService {
     let provider: StyleAiProvider;
     let output: StyleAiOutput | null = null;
     let errorMessage: string | null = null;
-    let jobStatus: "COMPLETED" | "FAILED" = "COMPLETED";
 
     try {
       provider = this.buildProvider(this.providerName);
@@ -67,7 +68,6 @@ export class StyleAiService {
       const realError =
         error instanceof Error ? error.message : "Unknown AI provider error";
       errorMessage = realError;
-      jobStatus = "FAILED";
 
       try {
         const fallbackProvider = new MockStyleProvider();
@@ -94,20 +94,24 @@ export class StyleAiService {
       }
     }
 
+    return { output: output as StyleAiOutput, jobId: job.id, errorMessage };
+  }
+
+  async finalizeJob(
+    jobId: string,
+    status: "COMPLETED" | "FAILED",
+    output: StyleAiOutput,
+    errorMessage: string | null
+  ): Promise<void> {
     await prisma.aiJob.update({
-      where: { id: job.id },
+      where: { id: jobId },
       data: {
-        status: jobStatus,
-        output:
-          output === null
-            ? Prisma.DbNull
-            : (output as unknown as Prisma.InputJsonValue),
+        status,
+        output: output as unknown as Prisma.InputJsonValue,
         errorMessage,
         completedAt: new Date(),
       },
     });
-
-    return output;
   }
 
   private buildProvider(name: string): StyleAiProvider {

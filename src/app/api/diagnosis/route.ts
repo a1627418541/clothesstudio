@@ -111,46 +111,64 @@ export async function POST(request: NextRequest) {
     };
 
     const styleAiService = new StyleAiService();
-    const aiOutput = await styleAiService.analyze(styleInput);
+    const { output, jobId, errorMessage } = await styleAiService.analyze(styleInput);
 
-    const updatedDiagnosis = await prisma.$transaction(async (tx) => {
-      await tx.styleDiagnosis.update({
-        where: { id: diagnosis.id },
-        data: {
-          bodyType: aiOutput.bodyType,
-          faceShape: aiOutput.faceShape,
-          vibeKeywords: aiOutput.vibeKeywords,
-          summary: aiOutput.summary,
-          status: "PREVIEW_READY",
-        },
-      });
+    let updatedDiagnosis;
+    try {
+      updatedDiagnosis = await prisma.$transaction(async (tx) => {
+        await tx.styleDiagnosis.update({
+          where: { id: diagnosis.id },
+          data: {
+            bodyType: output.bodyType,
+            faceShape: output.faceShape,
+            vibeKeywords: output.vibeKeywords,
+            summary: output.summary,
+            status: "PREVIEW_READY",
+          },
+        });
 
-      await tx.styleRecommendation.createMany({
-        data: aiOutput.recommendations.map((rec, index) => ({
-          diagnosisId: diagnosis.id,
-          title: rec.title,
-          description: rec.description,
-          summary: rec.summary,
-          clothingAdvice: rec.clothingAdvice,
-          hairstyleAdvice: rec.hairstyleAdvice,
-          shoesAdvice: rec.shoesAdvice,
-          colorPalette: rec.colorPalette,
-          avoidTips: rec.avoidTips,
-          rank: index + 1,
-          isPrimary: index === 0,
-        })),
-      });
+        await tx.styleRecommendation.createMany({
+          data: output.recommendations.map((rec, index) => ({
+            diagnosisId: diagnosis.id,
+            title: rec.title,
+            description: rec.description,
+            summary: rec.summary,
+            clothingAdvice: rec.clothingAdvice,
+            hairstyleAdvice: rec.hairstyleAdvice,
+            shoesAdvice: rec.shoesAdvice,
+            colorPalette: rec.colorPalette,
+            avoidTips: rec.avoidTips,
+            rank: index + 1,
+            isPrimary: index === 0,
+          })),
+        });
 
-      return tx.styleDiagnosis.findUniqueOrThrow({
-        where: { id: diagnosis.id },
+        return tx.styleDiagnosis.findUniqueOrThrow({
+          where: { id: diagnosis.id },
+        });
       });
-    });
+    } catch (error) {
+      await styleAiService.finalizeJob(
+        jobId,
+        "FAILED",
+        output,
+        errorMessage ?? "Diagnosis persistence failed"
+      );
+      throw error;
+    }
+
+    await styleAiService.finalizeJob(
+      jobId,
+      errorMessage ? "FAILED" : "COMPLETED",
+      output,
+      errorMessage
+    );
 
     return NextResponse.json(
       {
         id: updatedDiagnosis.id,
         status: updatedDiagnosis.status,
-        primaryRecommendation: aiOutput.recommendations[0],
+        primaryRecommendation: output.recommendations[0],
       },
       { status: 201 }
     );
