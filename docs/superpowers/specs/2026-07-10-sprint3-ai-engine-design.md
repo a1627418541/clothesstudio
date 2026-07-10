@@ -16,7 +16,8 @@ Replace the deterministic `mock-style-engine` with a pluggable AI provider layer
 - Validate AI output with Zod.
 - Fall back to mock recommendations if AI fails, so the user never sees an error.
 - Record every AI invocation as an `AiJob` linked to a `PromptVersion`.
-- Keep API keys and image bytes server-side only.
+- Keep API keys server-side only.
+- Keep image bytes server-side: images are stored in R2 and accessed via public URL only; image binary is never sent to the frontend nor uploaded directly by the browser to the AI provider.
 
 Out of scope: image generation, wardrobe, payments, community, Gemini full implementation, prompt management UI.
 
@@ -67,9 +68,10 @@ This is acceptable for the MVP because the R2 bucket is already public. Future s
 
 ### 2.4 Fallback behavior
 
-- If OpenAI call fails (timeout, HTTP error, malformed JSON, Zod validation failure), log the error in `AiJob.errorMessage` and call the mock provider.
+- If OpenAI call fails (timeout, HTTP error, malformed JSON, Zod validation failure), mark the `AiJob.status = FAILED`, store the real provider failure reason in `AiJob.errorMessage`, and then call the mock provider.
+- If the mock provider succeeds, store its structured output in `AiJob.output`. The `AiJob.status` remains `FAILED` because it records that the *real* AI provider failed, not that the user-facing diagnosis failed.
+- The user-facing diagnosis still completes successfully using fallback data; the frontend receives the same response shape regardless of fallback.
 - Mock provider always returns 3 recommendations so database structure stays consistent.
-- Frontend receives the same response shape regardless of fallback.
 
 ### 2.5 PromptVersion tracking
 
@@ -83,7 +85,7 @@ This is acceptable for the MVP because the R2 bucket is already public. Future s
 1. Create `AiJob` with `status = PENDING`, `type = DIAGNOSIS_ANALYSIS`, `promptVersionId`, `input` (diagnosisId, photo URLs, profile).
 2. Update to `status = RUNNING` before calling provider.
 3. On success: update to `COMPLETED`, store structured output in `output`.
-4. On failure: update to `FAILED`, store error summary in `errorMessage`, store fallback output in `output`.
+4. On failure: update to `FAILED`, store the real provider's error summary in `errorMessage`, store fallback output (from mock provider) in `output`. `FAILED` here means the real AI provider failed; the user still receives a successful diagnosis response built from fallback data.
 
 Never write API keys, DB credentials, or R2 secrets into `AiJob` fields.
 
@@ -328,7 +330,7 @@ const promptVersion = await prisma.promptVersion.upsert({
 - [ ] `AiJob` record is created for every submission with `promptVersionId`.
 - [ ] `PromptVersion` record exists after first AI call.
 - [ ] API key never appears in frontend bundle or API responses.
-- [ ] Image bytes never leave the server.
+- [ ] 图片二进制不会发送到前端，也不会由浏览器直接上传给 AI provider。Sprint 3 中，OpenAI 通过 R2 public URL 访问图片。
 - [ ] `GET /api/diagnosis/[id]` returns recommendations sorted by `rank asc`.
 - [ ] `/diagnosis/[id]` page shows primary + 2 alternatives.
 - [ ] `AI_PROVIDER=mock` still works for local development and tests.
@@ -352,9 +354,12 @@ const promptVersion = await prisma.promptVersion.upsert({
 
 ## 12. Migration Notes
 
-A small Prisma migration is required to add the `description` field to `StyleRecommendation`, because the current schema only has `title` and `summary`.
+A small Prisma migration may be required to add the `description` field to `StyleRecommendation`.
 
-Run:
+Before running the migration, check `prisma/schema.prisma`:
+
+- If `StyleRecommendation` already has a `description` field, skip the migration.
+- If it does not exist, add it and run:
 
 ```bash
 npx prisma migrate dev --name add_style_recommendation_description

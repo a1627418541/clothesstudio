@@ -234,6 +234,7 @@ model StyleRecommendation {
   diagnosis       StyleDiagnosis @relation(fields: [diagnosisId], references: [id], onDelete: Cascade)
 
   title           String
+  description     String?
   summary         String
   clothingAdvice  String
   hairstyleAdvice String
