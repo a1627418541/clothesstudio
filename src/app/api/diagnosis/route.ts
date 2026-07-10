@@ -3,7 +3,9 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getAnonymousSessionByToken } from "@/lib/anonymous-session";
 import { diagnosisFormSchema } from "@/lib/validators/diagnosis";
-import { generateMockStyleRecommendation } from "@/lib/mock-style-engine";
+import { StyleAiService } from "@/lib/ai/style-ai-service";
+import { StyleAiInput } from "@/lib/ai/style-ai-provider";
+
 export async function POST(request: NextRequest) {
   try {
     const session = await auth();
@@ -54,12 +56,20 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const primaryRecommendation = generateMockStyleRecommendation({
-      gender,
-      age,
-      heightCm,
-      weightKg,
-    });
+    const roleUrlMap: Record<string, string | undefined> = {};
+    for (const asset of assets) {
+      const role = (Object.entries(photoAssetIds).find(([, id]) => id === asset.id)?.[0]) as
+        | "FACE_FRONT"
+        | "FACE_SIDE"
+        | "FULL_BODY";
+      if (role) {
+        roleUrlMap[role] = asset.url ?? undefined;
+      }
+    }
+
+    if (!roleUrlMap.FACE_FRONT || !roleUrlMap.FACE_SIDE || !roleUrlMap.FULL_BODY) {
+      return NextResponse.json({ error: "Missing photo URLs" }, { status: 400 });
+    }
 
     const diagnosis = await prisma.$transaction(async (tx) => {
       const created = await tx.styleDiagnosis.create({
@@ -82,32 +92,65 @@ export async function POST(request: NextRequest) {
         ],
       });
 
-      await tx.styleRecommendation.create({
+      return created;
+    });
+
+    const styleInput: StyleAiInput = {
+      userId,
+      anonymousSessionId,
+      diagnosisId: diagnosis.id,
+      gender,
+      age,
+      heightCm,
+      weightKg,
+      photoUrls: {
+        FACE_FRONT: roleUrlMap.FACE_FRONT,
+        FACE_SIDE: roleUrlMap.FACE_SIDE,
+        FULL_BODY: roleUrlMap.FULL_BODY,
+      },
+    };
+
+    const styleAiService = new StyleAiService();
+    const aiOutput = await styleAiService.analyze(styleInput);
+
+    const updatedDiagnosis = await prisma.$transaction(async (tx) => {
+      await tx.styleDiagnosis.update({
+        where: { id: diagnosis.id },
         data: {
-          diagnosisId: created.id,
-          title: primaryRecommendation.title,
-          summary: primaryRecommendation.summary,
-          clothingAdvice: primaryRecommendation.clothingAdvice,
-          hairstyleAdvice: primaryRecommendation.hairstyleAdvice,
-          shoesAdvice: primaryRecommendation.shoesAdvice,
-          colorPalette: primaryRecommendation.colorPalette,
-          avoidTips: primaryRecommendation.avoidTips,
-          rank: 1,
-          isPrimary: true,
+          bodyType: aiOutput.bodyType,
+          faceShape: aiOutput.faceShape,
+          vibeKeywords: aiOutput.vibeKeywords,
+          summary: aiOutput.summary,
+          status: "PREVIEW_READY",
         },
       });
 
-      return tx.styleDiagnosis.update({
-        where: { id: created.id },
-        data: { status: "PREVIEW_READY" },
+      await tx.styleRecommendation.createMany({
+        data: aiOutput.recommendations.map((rec, index) => ({
+          diagnosisId: diagnosis.id,
+          title: rec.title,
+          description: rec.description,
+          summary: rec.summary,
+          clothingAdvice: rec.clothingAdvice,
+          hairstyleAdvice: rec.hairstyleAdvice,
+          shoesAdvice: rec.shoesAdvice,
+          colorPalette: rec.colorPalette,
+          avoidTips: rec.avoidTips,
+          rank: index + 1,
+          isPrimary: index === 0,
+        })),
+      });
+
+      return tx.styleDiagnosis.findUniqueOrThrow({
+        where: { id: diagnosis.id },
       });
     });
 
     return NextResponse.json(
       {
-        id: diagnosis.id,
-        status: diagnosis.status,
-        primaryRecommendation,
+        id: updatedDiagnosis.id,
+        status: updatedDiagnosis.status,
+        primaryRecommendation: aiOutput.recommendations[0],
       },
       { status: 201 }
     );
