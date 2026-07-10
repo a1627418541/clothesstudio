@@ -57,12 +57,11 @@ export class StyleAiService {
       data: { status: "RUNNING", startedAt: new Date() },
     });
 
-    let provider: StyleAiProvider;
-    let output: StyleAiOutput | null = null;
+    let output: StyleAiOutput;
     let errorMessage: string | null = null;
 
     try {
-      provider = this.buildProvider(this.providerName);
+      const provider = this.buildProvider(this.providerName);
       output = await provider.analyze(input);
     } catch (error) {
       const realError =
@@ -78,7 +77,6 @@ export class StyleAiService {
             ? fallbackError.message
             : "Unknown fallback AI provider error";
         errorMessage = `${realError}; fallback also failed: ${fallbackErrorMessage}`;
-        output = null;
 
         await prisma.aiJob.update({
           where: { id: job.id },
@@ -94,7 +92,7 @@ export class StyleAiService {
       }
     }
 
-    return { output: output as StyleAiOutput, jobId: job.id, errorMessage };
+    return { output, jobId: job.id, errorMessage };
   }
 
   async finalizeJob(

@@ -148,25 +148,20 @@ export async function POST(request: NextRequest) {
         });
       });
     } catch (error) {
+      const persistenceErrorMessage = error instanceof Error ? error.message : "Diagnosis persistence failed";
       try {
-        await styleAiService.finalizeJob(
-          jobId,
-          "PERSISTENCE_FAILED",
-          output,
-          errorMessage ?? "Diagnosis persistence failed"
-        );
+        await styleAiService.finalizeJob(jobId, "PERSISTENCE_FAILED", output, persistenceErrorMessage);
       } catch (finalizeError) {
         console.error("Failed to finalize AI job after persistence failure:", finalizeError);
       }
       throw error;
     }
 
-    await styleAiService.finalizeJob(
-      jobId,
-      errorMessage ? "FAILED" : "COMPLETED",
-      output,
-      errorMessage
-    );
+    try {
+      await styleAiService.finalizeJob(jobId, errorMessage ? "FAILED" : "COMPLETED", output, errorMessage);
+    } catch (finalizeError) {
+      console.error("Failed to finalize AI job after successful persistence:", finalizeError);
+    }
 
     return NextResponse.json(
       {
