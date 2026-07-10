@@ -18,7 +18,11 @@ export class OpenAiStyleProvider implements StyleAiProvider {
   private client: OpenAI;
   private model: string;
 
-  constructor(apiKey: string, model = STYLE_DIAGNOSIS_MODEL) {
+  constructor(model = STYLE_DIAGNOSIS_MODEL) {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      throw new Error("OPENAI_API_KEY is required when AI_PROVIDER=openai");
+    }
     this.client = new OpenAI({ apiKey });
     this.model = model;
   }
@@ -52,6 +56,7 @@ export class OpenAiStyleProvider implements StyleAiProvider {
       ],
       max_tokens: 2048,
       temperature: 0.7,
+      response_format: { type: "json_object" },
     });
 
     const rawContent = response.choices[0]?.message?.content;
@@ -63,7 +68,7 @@ export class OpenAiStyleProvider implements StyleAiProvider {
     let parsed: unknown;
     try {
       parsed = JSON.parse(cleaned);
-    } catch (err) {
+    } catch {
       throw new Error(`OpenAI returned non-JSON content: ${cleaned.slice(0, 200)}`);
     }
 
