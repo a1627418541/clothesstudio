@@ -55,12 +55,13 @@ export class StyleAiService {
       data: { status: "RUNNING", startedAt: new Date() },
     });
 
-    const provider = this.buildProvider(this.providerName);
+    let provider: StyleAiProvider;
     let output: StyleAiOutput;
     let errorMessage: string | null = null;
     let jobStatus: "COMPLETED" | "FAILED" = "COMPLETED";
 
     try {
+      provider = this.buildProvider(this.providerName);
       output = await provider.analyze(input);
     } catch (error) {
       errorMessage =
