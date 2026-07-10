@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "AiJobStatus" ADD VALUE 'PERSISTENCE_FAILED';
