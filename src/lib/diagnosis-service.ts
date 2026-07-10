@@ -19,6 +19,7 @@ export interface DiagnosisDetail {
     mimeType: string;
   }[];
   recommendations: {
+    id: string;
     rank: number;
     isPrimary: boolean;
     title: string;
@@ -29,6 +30,9 @@ export interface DiagnosisDetail {
     shoesAdvice: string;
     colorPalette: string[];
     avoidTips: string[];
+    previewImageUrl: string | null;
+    previewImageStatus: string;
+    previewImageError: string | null;
   }[];
 }
 
@@ -98,6 +102,7 @@ export async function getDiagnosisDetailForViewer({
     createdAt: diagnosis.createdAt,
     photos: orderedPhotos,
     recommendations: diagnosis.recommendations.map((rec) => ({
+      id: rec.id,
       rank: rec.rank,
       isPrimary: rec.isPrimary,
       title: rec.title,
@@ -108,6 +113,9 @@ export async function getDiagnosisDetailForViewer({
       shoesAdvice: rec.shoesAdvice,
       colorPalette: rec.colorPalette,
       avoidTips: rec.avoidTips,
+      previewImageUrl: rec.previewImageUrl,
+      previewImageStatus: rec.previewImageStatus,
+      previewImageError: rec.previewImageError,
     })),
   };
 
