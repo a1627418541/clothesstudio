@@ -87,7 +87,7 @@ export async function generateStylePreviewImage(
       return {
         status: "FAILED",
         prompt,
-        error: `OpenAI failed: ${providerError}; mock fallback also failed`,
+        error: `OpenAI style preview failed: ${providerError}; mock fallback also failed`,
       };
     }
 

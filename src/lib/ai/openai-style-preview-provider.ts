@@ -1,16 +1,16 @@
 import { StylePreviewImageProvider } from "./style-preview-image-provider";
 
 function getBaseUrl(): string {
-  const baseUrl = process.env.OPENAI_BASE_URL?.trim();
+  const baseUrl = process.env.STYLE_PREVIEW_OPENAI_BASE_URL?.trim();
   if (!baseUrl) return "https://api.openai.com/v1";
   return baseUrl.replace(/\/$/, "");
 }
 
 export const openaiStylePreviewProvider: StylePreviewImageProvider = {
   generate: async ({ prompt, size = "1024x1024" }) => {
-    const apiKey = process.env.OPENAI_API_KEY;
+    const apiKey = process.env.STYLE_PREVIEW_OPENAI_API_KEY;
     if (!apiKey) {
-      return { url: null, error: "OPENAI_API_KEY is not configured" };
+      return { url: null, error: "STYLE_PREVIEW_OPENAI_API_KEY is not configured" };
     }
 
     const model = process.env.STYLE_PREVIEW_MODEL?.trim() || "gpt-image-2";
