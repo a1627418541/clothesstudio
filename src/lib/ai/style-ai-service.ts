@@ -56,7 +56,7 @@ export class StyleAiService {
     });
 
     let provider: StyleAiProvider;
-    let output: StyleAiOutput;
+    let output: StyleAiOutput | null = null;
     let errorMessage: string | null = null;
     let jobStatus: "COMPLETED" | "FAILED" = "COMPLETED";
 
@@ -64,19 +64,44 @@ export class StyleAiService {
       provider = this.buildProvider(this.providerName);
       output = await provider.analyze(input);
     } catch (error) {
-      errorMessage =
+      const realError =
         error instanceof Error ? error.message : "Unknown AI provider error";
+      errorMessage = realError;
       jobStatus = "FAILED";
 
-      const fallbackProvider = new MockStyleProvider();
-      output = await fallbackProvider.analyze(input);
+      try {
+        const fallbackProvider = new MockStyleProvider();
+        output = await fallbackProvider.analyze(input);
+      } catch (fallbackError) {
+        const fallbackErrorMessage =
+          fallbackError instanceof Error
+            ? fallbackError.message
+            : "Unknown fallback AI provider error";
+        errorMessage = `${realError}; fallback also failed: ${fallbackErrorMessage}`;
+        output = null;
+
+        await prisma.aiJob.update({
+          where: { id: job.id },
+          data: {
+            status: "FAILED",
+            output: Prisma.DbNull,
+            errorMessage,
+            completedAt: new Date(),
+          },
+        });
+
+        throw fallbackError;
+      }
     }
 
     await prisma.aiJob.update({
       where: { id: job.id },
       data: {
         status: jobStatus,
-        output: output as unknown as Prisma.InputJsonValue,
+        output:
+          output === null
+            ? Prisma.DbNull
+            : (output as unknown as Prisma.InputJsonValue),
         errorMessage,
         completedAt: new Date(),
       },
