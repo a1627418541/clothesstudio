@@ -1,4 +1,5 @@
 import { StylePreviewImageProvider } from "./style-preview-image-provider";
+import { pollEvoLinkStylePreviewTask } from "./evolink-style-preview-task";
 import { parseStylePreviewResponse } from "./style-preview-response";
 
 function getBaseUrl(): string {
@@ -50,6 +51,13 @@ export const openaiStylePreviewProvider: StylePreviewImageProvider = {
       const parsed = parseStylePreviewResponse(data);
       if ("error" in parsed) {
         return { url: null, error: parsed.error };
+      }
+      if ("taskId" in parsed) {
+        return pollEvoLinkStylePreviewTask({
+          baseUrl,
+          apiKey,
+          taskId: parsed.taskId,
+        });
       }
 
       return parsed;

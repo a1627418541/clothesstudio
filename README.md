@@ -77,16 +77,20 @@ Text diagnosis and style preview images use **separate provider configurations**
 | `STYLE_PREVIEW_PROVIDER` | no | `mock` | `openai` or `mock`. |
 | `STYLE_PREVIEW_MODEL` | no | `gpt-image-2` | Image model, e.g. `gpt-image-2`. |
 | `STYLE_PREVIEW_OPENAI_API_KEY` | yes if provider=openai | — | **Separate** from `OPENAI_API_KEY`. Server-side only. |
-| `STYLE_PREVIEW_OPENAI_BASE_URL` | no | `https://api.openai.com/v1` | OpenAI `/images/generations` endpoint. |
+| `STYLE_PREVIEW_OPENAI_BASE_URL` | no | `https://api.openai.com/v1` | OpenAI-compatible base URL. EvoLink: `https://api.evolink.ai/v1`. |
 | `STYLE_PREVIEW_FALLBACK_TO_MOCK` | no | `false` | Fallback to mock if image generation fails. Useful in development. |
 
 - Set `STYLE_PREVIEW_PROVIDER=mock` to show placeholder style images.
 - Set `STYLE_PREVIEW_PROVIDER=openai` and provide `STYLE_PREVIEW_OPENAI_API_KEY` for real style preview images.
+- EvoLink async image tasks are polled until completion (up to about 150 seconds);
+  the returned provider image is then copied to R2 immediately.
 - The image provider never reuses `OPENAI_API_KEY`, avoiding accidental StarAPI-key usage on an OpenAI image endpoint.
 - Automatic preview generation runs once for each `PENDING` recommendation.
   Failed previews are retried only when the user explicitly clicks the retry button.
 - All successful provider and mock-fallback images are copied to R2 before the
   recommendation is marked `COMPLETED`.
+- The three recommendation previews run concurrently so their task wait times
+  do not add up serially.
 
 ## Database Setup
 
