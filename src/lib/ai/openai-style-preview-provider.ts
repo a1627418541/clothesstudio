@@ -1,4 +1,5 @@
 import { StylePreviewImageProvider } from "./style-preview-image-provider";
+import { parseStylePreviewResponse } from "./style-preview-response";
 
 function getBaseUrl(): string {
   const baseUrl = process.env.STYLE_PREVIEW_OPENAI_BASE_URL?.trim();
@@ -45,16 +46,13 @@ export const openaiStylePreviewProvider: StylePreviewImageProvider = {
         return { url: null, error: detail };
       }
 
-      const data = await res.json();
-      const item = data?.data?.[0];
-      const url: string | undefined = item?.url;
-      const b64: string | undefined = item?.b64_json;
-
-      if (!url && !b64) {
-        return { url: null, error: "OpenAI returned no image data" };
+      const data: unknown = await res.json();
+      const parsed = parseStylePreviewResponse(data);
+      if ("error" in parsed) {
+        return { url: null, error: parsed.error };
       }
 
-      return { url: url ?? null, base64: b64 ?? null };
+      return parsed;
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown provider error";
       return { url: null, error: message };

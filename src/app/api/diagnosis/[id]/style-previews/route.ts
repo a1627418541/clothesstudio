@@ -4,12 +4,13 @@ import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { getAnonymousSessionByToken } from "@/lib/anonymous-session";
 import { generateStylePreviewImage } from "@/lib/ai/style-preview-service";
+import { getRequestedPreviewStatuses } from "@/lib/ai/style-preview-policy";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
-export async function POST(_request: NextRequest, { params }: RouteContext) {
+export async function POST(request: NextRequest, { params }: RouteContext) {
   try {
     const { id } = await params;
 
@@ -49,19 +50,29 @@ export async function POST(_request: NextRequest, { params }: RouteContext) {
       }
     }
 
-    const candidates = diagnosis.recommendations.filter(
-      (rec) => rec.previewImageStatus === "PENDING" || rec.previewImageStatus === "FAILED"
+    const retryFailed = request.nextUrl.searchParams.get("retryFailed") === "true";
+    const requestedStatuses = getRequestedPreviewStatuses(retryFailed);
+    const candidates = diagnosis.recommendations.filter((rec) =>
+      requestedStatuses.includes(rec.previewImageStatus)
     );
 
     let updated = 0;
-    const skipped = diagnosis.recommendations.length - candidates.length;
+    let skipped = diagnosis.recommendations.length - candidates.length;
     let failed = 0;
 
     for (const rec of candidates) {
-      await prisma.styleRecommendation.update({
-        where: { id: rec.id },
+      const claim = await prisma.styleRecommendation.updateMany({
+        where: {
+          id: rec.id,
+          previewImageStatus: rec.previewImageStatus,
+        },
         data: { previewImageStatus: "PROCESSING", previewImageError: null },
       });
+
+      if (claim.count === 0) {
+        skipped++;
+        continue;
+      }
 
       try {
         const result = await generateStylePreviewImage({
@@ -74,7 +85,6 @@ export async function POST(_request: NextRequest, { params }: RouteContext) {
           },
           recommendation: rec,
         });
-
         if (result.status === "COMPLETED") {
           await prisma.styleRecommendation.update({
             where: { id: rec.id },

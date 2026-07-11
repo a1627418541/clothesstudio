@@ -3,6 +3,7 @@ import { buildStylePreviewPrompt } from "./style-preview-prompt";
 import { openaiStylePreviewProvider } from "./openai-style-preview-provider";
 import { mockStylePreviewProvider } from "./mock-style-preview-provider";
 import { storeImageFromUrlOrBase64 } from "@/lib/r2-image-store";
+import { StylePreviewImageProvider } from "./style-preview-image-provider";
 
 export interface GenerateStylePreviewInput {
   diagnosis: {
@@ -33,7 +34,7 @@ export interface GenerateStylePreviewResult {
   error?: string;
 }
 
-function getProvider() {
+function getProvider(): { provider: StylePreviewImageProvider; name: string } {
   const providerName = process.env.STYLE_PREVIEW_PROVIDER?.toLowerCase().trim() || "mock";
 
   if (providerName === "openai") {
@@ -52,8 +53,23 @@ function shouldFallbackToMock(): boolean {
   return nodeEnv === "development" || nodeEnv === "test";
 }
 
+interface StylePreviewDependencies {
+  getProvider: () => { provider: StylePreviewImageProvider; name: string };
+  mockProvider: StylePreviewImageProvider;
+  storeImage: typeof storeImageFromUrlOrBase64;
+  shouldFallbackToMock: () => boolean;
+}
+
+const defaultDependencies: StylePreviewDependencies = {
+  getProvider,
+  mockProvider: mockStylePreviewProvider,
+  storeImage: storeImageFromUrlOrBase64,
+  shouldFallbackToMock,
+};
+
 export async function generateStylePreviewImage(
-  input: GenerateStylePreviewInput
+  input: GenerateStylePreviewInput,
+  dependencies: StylePreviewDependencies = defaultDependencies
 ): Promise<GenerateStylePreviewResult> {
   const { diagnosis, recommendation } = input;
 
@@ -69,51 +85,43 @@ export async function generateStylePreviewImage(
     colorPalette: recommendation.colorPalette,
   });
 
-  const { provider, name } = getProvider();
-  const providerResult = await provider.generate({ prompt });
+  const { provider, name } = dependencies.getProvider();
+  let providerResult = await provider.generate({ prompt });
 
   if (providerResult.error || (!providerResult.url && !providerResult.base64)) {
     const providerError = providerResult.error || "Provider returned no image";
 
-    if (name === "openai" && shouldFallbackToMock()) {
-      const fallback = await mockStylePreviewProvider.generate({ prompt });
-      if (fallback.url) {
+    if (name === "openai" && dependencies.shouldFallbackToMock()) {
+      providerResult = await dependencies.mockProvider.generate({ prompt });
+      if (
+        providerResult.error ||
+        (!providerResult.url && !providerResult.base64)
+      ) {
         return {
-          status: "COMPLETED",
-          url: fallback.url,
+          status: "FAILED",
           prompt,
+          error:
+            `OpenAI style preview failed: ${providerError}; ` +
+            `mock fallback also failed: ${providerResult.error || "no image returned"}`,
         };
       }
+    } else {
       return {
         status: "FAILED",
         prompt,
-        error: `OpenAI style preview failed: ${providerError}; mock fallback also failed`,
+        error: providerError,
       };
     }
-
-    return {
-      status: "FAILED",
-      prompt,
-      error: providerError,
-    };
   }
 
   const r2Key = `style-previews/${diagnosis.id}/${recommendation.id}-${Date.now()}.png`;
-  const storeResult = await storeImageFromUrlOrBase64({
+  const storeResult = await dependencies.storeImage({
     url: providerResult.url,
     base64: providerResult.base64,
     key: r2Key,
   });
 
   if ("error" in storeResult) {
-    if (providerResult.url && shouldFallbackToMock()) {
-      return {
-        status: "COMPLETED",
-        url: providerResult.url,
-        prompt,
-      };
-    }
-
     return {
       status: "FAILED",
       prompt,

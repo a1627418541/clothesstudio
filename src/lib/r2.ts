@@ -25,6 +25,33 @@ export interface UploadBufferToR2Result {
   url: string;
 }
 
+export function buildR2PublicUrl(
+  publicBaseUrl: string | undefined,
+  key: string
+): string {
+  if (!publicBaseUrl?.trim()) {
+    throw new Error("Missing CLOUDFLARE_R2_PUBLIC_BASE_URL");
+  }
+
+  const normalizedBaseUrl = publicBaseUrl.trim().replace(/\/+$/, "");
+  let parsed: URL;
+  try {
+    parsed = new URL(normalizedBaseUrl);
+  } catch {
+    throw new Error(
+      "CLOUDFLARE_R2_PUBLIC_BASE_URL must be an absolute HTTP(S) URL"
+    );
+  }
+
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new Error(
+      "CLOUDFLARE_R2_PUBLIC_BASE_URL must be an absolute HTTP(S) URL"
+    );
+  }
+
+  return `${normalizedBaseUrl}/${key.replace(/^\/+/, "")}`;
+}
+
 export async function uploadBufferToR2(params: {
   key: string;
   body: Buffer;
@@ -48,7 +75,7 @@ export async function uploadBufferToR2(params: {
     })
   );
 
-  const url = publicBaseUrl ? `${publicBaseUrl}/${params.key}` : params.key;
+  const url = buildR2PublicUrl(publicBaseUrl, params.key);
 
   return {
     bucket,
