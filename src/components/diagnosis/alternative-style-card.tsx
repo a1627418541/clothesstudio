@@ -1,21 +1,9 @@
 import { ColorPalette } from "./color-palette";
 import { StylePreviewImage } from "./style-preview-image";
+import { ReportRecommendation } from "@/types/diagnosis";
 import { Ban } from "lucide-react";
 
-interface Recommendation {
-  id: string;
-  title: string;
-  description: string | null;
-  summary: string;
-  clothingAdvice: string;
-  hairstyleAdvice: string;
-  shoesAdvice: string;
-  colorPalette: string[];
-  avoidTips: string[];
-  previewImageUrl: string | null;
-  previewImageStatus: string;
-  previewImageError: string | null;
-}
+type Recommendation = ReportRecommendation;
 
 interface AlternativeStyleCardProps {
   recommendation: Recommendation;
@@ -43,6 +31,29 @@ export function AlternativeStyleCard({ recommendation, rank }: AlternativeStyleC
         {recommendation.description && (
           <p className="mt-1 text-sm font-medium text-[#B85C4F]">{recommendation.description}</p>
         )}
+
+        {recommendation.archetype && (
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center rounded-full bg-[#B85C4F] px-2.5 py-0.5 text-xs font-medium text-white">
+              {recommendation.archetype.name}
+            </span>
+            {recommendation.archetype.personalityLabel && (
+              <span className="text-xs font-medium text-[#6F6A63]">
+                {recommendation.archetype.personalityLabel}
+              </span>
+            )}
+            <span className="inline-flex items-center rounded-full border border-[#E8E2DA] bg-[#FAFAF8] px-2.5 py-0.5 text-xs font-medium text-[#6F6A63]">
+              {recommendation.archetype.category}
+            </span>
+            {recommendation.matchScore !== null && (
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-[#2E7D5A]">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#2E7D5A]" />
+                {recommendation.matchScore}% match
+              </span>
+            )}
+          </div>
+        )}
+
         <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-[#6F6A63]">{recommendation.summary}</p>
 
         <div className="mt-4">

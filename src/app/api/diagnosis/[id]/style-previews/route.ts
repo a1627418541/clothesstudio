@@ -34,6 +34,20 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       include: {
         recommendations: {
           orderBy: { rank: "asc" },
+          include: {
+            archetype: {
+              select: {
+                name: true,
+                personalityLabel: true,
+                imagePromptTemplate: true,
+                clothingDNA: true,
+                hairstyleDNA: true,
+                shoesDNA: true,
+                colorDNA: true,
+                avoidDNA: true,
+              },
+            },
+          },
         },
       },
     });
@@ -90,6 +104,8 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
               age: diagnosis.age,
               heightCm: diagnosis.heightCm,
               weightKg: diagnosis.weightKg,
+              bodyType: diagnosis.bodyType,
+              faceShape: diagnosis.faceShape,
             },
             recommendation: rec,
           });

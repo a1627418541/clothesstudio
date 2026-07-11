@@ -10,6 +10,7 @@ import { AlternativeStyleCard } from "@/components/diagnosis/alternative-style-c
 import { FullStylingAdvice } from "@/components/diagnosis/full-styling-advice";
 import { UploadedPhotos } from "@/components/diagnosis/uploaded-photos";
 import { shouldAutoGenerateStylePreviews } from "@/lib/ai/style-preview-policy";
+import { ReportRecommendation } from "@/types/diagnosis";
 
 interface DiagnosisDetail {
   id: string;
@@ -27,22 +28,7 @@ interface DiagnosisDetail {
   recommendations: Recommendation[];
 }
 
-interface Recommendation {
-  id: string;
-  rank: number;
-  isPrimary: boolean;
-  title: string;
-  description: string | null;
-  summary: string;
-  clothingAdvice: string;
-  hairstyleAdvice: string;
-  shoesAdvice: string;
-  colorPalette: string[];
-  avoidTips: string[];
-  previewImageUrl: string | null;
-  previewImageStatus: string;
-  previewImageError: string | null;
-}
+type Recommendation = ReportRecommendation;
 
 function InfoPill({ label, value }: { label: string; value: React.ReactNode }) {
   return (
