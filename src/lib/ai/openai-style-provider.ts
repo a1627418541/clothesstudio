@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { getOpenAiClientOptions } from "@/lib/ai/openai-client-config";
 import {
   StyleAiProvider,
   StyleAiInput,
@@ -23,7 +24,9 @@ export class OpenAiStyleProvider implements StyleAiProvider {
     if (!apiKey) {
       throw new Error("OPENAI_API_KEY is required when AI_PROVIDER=openai");
     }
-    this.client = new OpenAI({ apiKey });
+    this.client = new OpenAI(
+      getOpenAiClientOptions(apiKey, process.env.OPENAI_BASE_URL)
+    );
     this.model = model;
   }
 

@@ -5,6 +5,7 @@ import { uploadBufferToR2 } from "@/lib/r2";
 import { prisma } from "@/lib/prisma";
 import { nanoid } from "nanoid";
 import { DiagnosisPhotoRole } from "@prisma/client";
+import { isOwnedByActor } from "@/lib/ownership";
 
 const ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic"];
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -60,6 +61,36 @@ export async function POST(request: NextRequest) {
 
     if (file.size > MAX_FILE_SIZE) {
       return NextResponse.json({ error: "File too large. Max 10MB." }, { status: 400 });
+    }
+
+    if (diagnosisId) {
+      if (!role || !Object.values(DiagnosisPhotoRole).includes(role)) {
+        return NextResponse.json(
+          { error: "A valid photo role is required when diagnosisId is provided" },
+          { status: 400 }
+        );
+      }
+
+      const diagnosis = await prisma.styleDiagnosis.findUnique({
+        where: { id: diagnosisId },
+        select: {
+          userId: true,
+          anonymousSessionId: true,
+        },
+      });
+
+      if (!diagnosis) {
+        return NextResponse.json({ error: "Diagnosis not found" }, { status: 404 });
+      }
+
+      if (
+        !isOwnedByActor(diagnosis, {
+          userId: userId ?? null,
+          anonymousSessionId,
+        })
+      ) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
     }
 
     const bytes = await file.arrayBuffer();

@@ -9,6 +9,7 @@ import { PrimaryStyleDirection } from "@/components/diagnosis/primary-style-dire
 import { AlternativeStyleCard } from "@/components/diagnosis/alternative-style-card";
 import { FullStylingAdvice } from "@/components/diagnosis/full-styling-advice";
 import { UploadedPhotos } from "@/components/diagnosis/uploaded-photos";
+import { shouldAutoGenerateStylePreviews } from "@/lib/ai/style-preview-policy";
 
 interface DiagnosisDetail {
   id: string;
@@ -77,6 +78,7 @@ export default function DiagnosisDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isGeneratingPreviews, setIsGeneratingPreviews] = useState(false);
+  const [previewGenerationError, setPreviewGenerationError] = useState<string | null>(null);
 
   const fetchDiagnosis = useCallback(async () => {
     try {
@@ -100,39 +102,43 @@ export default function DiagnosisDetailPage() {
     fetchDiagnosis();
   }, [fetchDiagnosis]);
 
+  const requestStylePreviews = useCallback(
+    async (retryFailed: boolean) => {
+      if (isGeneratingPreviews) return;
+
+      setIsGeneratingPreviews(true);
+      setPreviewGenerationError(null);
+
+      try {
+        const query = retryFailed ? "?retryFailed=true" : "";
+        const res = await fetch(`/api/diagnosis/${id}/style-previews${query}`, {
+          method: "POST",
+        });
+        const data = await res.json();
+
+        if (!res.ok || !data.ok) {
+          throw new Error(data.error || "Style preview generation failed");
+        }
+
+        await fetchDiagnosis();
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Style preview generation failed";
+        setPreviewGenerationError(message);
+      } finally {
+        setIsGeneratingPreviews(false);
+      }
+    },
+    [fetchDiagnosis, id, isGeneratingPreviews]
+  );
+
   useEffect(() => {
     if (!diagnosis || isGeneratingPreviews) return;
 
-    const hasPending = diagnosis.recommendations.some(
-      (rec) => rec.previewImageStatus === "PENDING" || rec.previewImageStatus === "FAILED"
-    );
+    if (!shouldAutoGenerateStylePreviews(diagnosis.recommendations)) return;
 
-    if (!hasPending) return;
-
-    let cancelled = false;
-    setIsGeneratingPreviews(true);
-
-    fetch(`/api/diagnosis/${id}/style-previews`, { method: "POST" })
-      .then((res) => res.json())
-      .then((data) => {
-        if (cancelled) return;
-        if (data.ok) {
-          fetchDiagnosis();
-        }
-      })
-      .catch(() => {
-        // Silent fail; UI will show fallback state.
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setIsGeneratingPreviews(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [diagnosis, fetchDiagnosis, id, isGeneratingPreviews]);
+    void requestStylePreviews(false);
+  }, [diagnosis, isGeneratingPreviews, requestStylePreviews]);
 
   if (loading) {
     return (
@@ -148,6 +154,9 @@ export default function DiagnosisDetailPage() {
 
   const primaryRec = diagnosis.recommendations.find((r) => r.isPrimary) ?? diagnosis.recommendations[0];
   const alternatives = diagnosis.recommendations.filter((r) => !r.isPrimary);
+  const hasFailedPreviews = diagnosis.recommendations.some(
+    (rec) => rec.previewImageStatus === "FAILED"
+  );
   const createdAt = new Date(diagnosis.createdAt).toLocaleDateString("en-US", {
     year: "numeric",
     month: "long",
@@ -218,6 +227,27 @@ export default function DiagnosisDetailPage() {
         <FullStylingAdvice recommendations={diagnosis.recommendations} />
 
         <UploadedPhotos photos={diagnosis.photos} />
+
+        {hasFailedPreviews && (
+          <section className="mb-8 rounded-2xl border border-[#E8E2DA] bg-white p-5 text-center">
+            <p className="text-sm text-[#6F6A63]">
+              One or more style previews could not be generated. They will not retry
+              automatically.
+            </p>
+            {previewGenerationError && (
+              <p className="mt-2 text-sm text-[#C73E3E]">{previewGenerationError}</p>
+            )}
+            <button
+              type="button"
+              disabled={isGeneratingPreviews}
+              onClick={() => void requestStylePreviews(true)}
+              className="mt-4 inline-flex items-center justify-center gap-2 rounded-full bg-[#B85C4F] px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#9A4A3F] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isGeneratingPreviews && <Loader2 className="h-4 w-4 animate-spin" />}
+              Retry Failed Previews
+            </button>
+          </section>
+        )}
 
         <section className="mb-8 rounded-3xl border border-[#E8E2DA] bg-white p-6 text-center shadow-sm md:p-8">
           <h2 className="text-lg font-semibold text-[#181614]">Want to see yourself in this style?</h2>
