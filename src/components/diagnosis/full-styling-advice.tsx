@@ -1,19 +1,8 @@
 import { Shirt, Sparkles, Footprints, Palette, Ban } from "lucide-react";
 import { ColorPalette } from "./color-palette";
+import { ReportRecommendation } from "@/types/diagnosis";
 
-interface Recommendation {
-  id: string;
-  rank: number;
-  isPrimary: boolean;
-  title: string;
-  description: string | null;
-  summary: string;
-  clothingAdvice: string;
-  hairstyleAdvice: string;
-  shoesAdvice: string;
-  colorPalette: string[];
-  avoidTips: string[];
-}
+type Recommendation = ReportRecommendation;
 
 interface FullStylingAdviceProps {
   recommendations: Recommendation[];
@@ -52,6 +41,23 @@ export function FullStylingAdvice({ recommendations }: FullStylingAdviceProps) {
               </span>
               <h3 className="text-lg font-semibold text-[#181614]">{rec.title}</h3>
             </div>
+
+            {rec.archetype && (
+              <div className="mb-4 flex flex-wrap items-center gap-2">
+                <span className="text-xs font-medium text-[#B85C4F]">
+                  {rec.archetype.name}
+                </span>
+                {rec.archetype.personalityLabel && (
+                  <span className="text-xs text-[#6F6A63]">
+                    {rec.archetype.personalityLabel}
+                  </span>
+                )}
+                <span className="text-xs text-[#6F6A63]">{" · "}{rec.archetype.category}</span>
+                {rec.matchScore !== null && (
+                  <span className="text-xs text-[#2E7D5A]">{" · "}{rec.matchScore}% match</span>
+                )}
+              </div>
+            )}
 
             <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
               {ADVICE_BLOCKS.map(({ key, label, icon }) => (

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { ReportRecommendation } from "@/types/diagnosis";
 import { DiagnosisPhotoRole } from "@prisma/client";
 
 export interface DiagnosisDetail {
@@ -18,22 +19,7 @@ export interface DiagnosisDetail {
     url: string | null;
     mimeType: string;
   }[];
-  recommendations: {
-    id: string;
-    rank: number;
-    isPrimary: boolean;
-    title: string;
-    description: string | null;
-    summary: string;
-    clothingAdvice: string;
-    hairstyleAdvice: string;
-    shoesAdvice: string;
-    colorPalette: string[];
-    avoidTips: string[];
-    previewImageUrl: string | null;
-    previewImageStatus: string;
-    previewImageError: string | null;
-  }[];
+  recommendations: ReportRecommendation[];
 }
 
 const PHOTO_ORDER: DiagnosisPhotoRole[] = ["FACE_FRONT", "FACE_SIDE", "FULL_BODY"];
@@ -60,6 +46,16 @@ export async function getDiagnosisDetailForViewer({
       },
       recommendations: {
         orderBy: { rank: "asc" },
+        include: {
+          archetype: {
+            select: {
+              id: true,
+              name: true,
+              personalityLabel: true,
+              category: true,
+            },
+          },
+        },
       },
     },
   });
@@ -116,6 +112,15 @@ export async function getDiagnosisDetailForViewer({
       previewImageUrl: rec.previewImageUrl,
       previewImageStatus: rec.previewImageStatus,
       previewImageError: rec.previewImageError,
+      archetype: rec.archetype
+        ? {
+            id: rec.archetype.id,
+            name: rec.archetype.name,
+            personalityLabel: rec.archetype.personalityLabel,
+            category: rec.archetype.category,
+          }
+        : null,
+      matchScore: rec.matchScore,
     })),
   };
 
