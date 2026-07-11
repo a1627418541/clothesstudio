@@ -8,6 +8,7 @@
     "start": "next start",
     "test": "vitest run",
     "lint": "eslint",
+    "seed": "tsx prisma/seed-style-archetypes.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {

@@ -5,6 +5,8 @@ import { getAnonymousSessionByToken } from "@/lib/anonymous-session";
 import { diagnosisFormSchema } from "@/lib/validators/diagnosis";
 import { StyleAiService } from "@/lib/ai/style-ai-service";
 import { StyleAiInput } from "@/lib/ai/style-ai-provider";
+import { MATCH_WEIGHTS } from "@/lib/style-archetype/match-config";
+import { buildMatchedRecommendations, MatchedRecommendation } from "@/lib/style-archetype/diagnosis-matcher";
 
 export async function POST(request: NextRequest) {
   try {
@@ -113,6 +115,21 @@ export async function POST(request: NextRequest) {
     const styleAiService = new StyleAiService();
     const { output, jobId, errorMessage } = await styleAiService.analyze(styleInput);
 
+    const archetypes = await prisma.styleArchetype.findMany({
+      where: { active: true },
+      orderBy: { createdAt: "asc" },
+    });
+
+    const matchedRecommendations: MatchedRecommendation[] = buildMatchedRecommendations(
+      { gender, age, heightCm, weightKg },
+      output,
+      archetypes,
+      {
+        topK: 3,
+        weights: MATCH_WEIGHTS,
+      }
+    );
+
     let updatedDiagnosis;
     try {
       updatedDiagnosis = await prisma.$transaction(async (tx) => {
@@ -128,18 +145,20 @@ export async function POST(request: NextRequest) {
         });
 
         await tx.styleRecommendation.createMany({
-          data: output.recommendations.map((rec, index) => ({
+          data: matchedRecommendations.map((item, index) => ({
             diagnosisId: diagnosis.id,
-            title: rec.title,
-            description: rec.description,
-            summary: rec.summary,
-            clothingAdvice: rec.clothingAdvice,
-            hairstyleAdvice: rec.hairstyleAdvice,
-            shoesAdvice: rec.shoesAdvice,
-            colorPalette: rec.colorPalette,
-            avoidTips: rec.avoidTips,
+            title: item.recommendation.title,
+            description: item.recommendation.description,
+            summary: item.recommendation.summary,
+            clothingAdvice: item.recommendation.clothingAdvice,
+            hairstyleAdvice: item.recommendation.hairstyleAdvice,
+            shoesAdvice: item.recommendation.shoesAdvice,
+            colorPalette: item.recommendation.colorPalette,
+            avoidTips: item.recommendation.avoidTips,
             rank: index + 1,
             isPrimary: index === 0,
+            archetypeId: item.archetypeId ?? null,
+            matchScore: item.matchScore ?? null,
           })),
         });
 

@@ -1,5 +1,5 @@
-import { StyleRecommendation } from "@prisma/client";
-import { buildStylePreviewPrompt } from "./style-preview-prompt";
+import { StyleRecommendation, StyleArchetype } from "@prisma/client";
+import { buildStylePreviewPrompt, buildArchetypeStylePreviewPrompt } from "./style-preview-prompt";
 import { openaiStylePreviewProvider } from "./openai-style-preview-provider";
 import { mockStylePreviewProvider } from "./mock-style-preview-provider";
 import { storeImageFromUrlOrBase64 } from "@/lib/r2-image-store";
@@ -12,6 +12,8 @@ export interface GenerateStylePreviewInput {
     age: number;
     heightCm: number;
     weightKg: number;
+    bodyType?: string | null;
+    faceShape?: string | null;
   };
   recommendation: Pick<
     StyleRecommendation,
@@ -24,7 +26,19 @@ export interface GenerateStylePreviewInput {
     | "hairstyleAdvice"
     | "shoesAdvice"
     | "colorPalette"
-  >;
+  > & {
+    archetype?: Pick<
+      StyleArchetype,
+      | "name"
+      | "personalityLabel"
+      | "imagePromptTemplate"
+      | "clothingDNA"
+      | "hairstyleDNA"
+      | "shoesDNA"
+      | "colorDNA"
+      | "avoidDNA"
+    > | null;
+  };
 }
 
 export interface GenerateStylePreviewResult {
@@ -73,17 +87,25 @@ export async function generateStylePreviewImage(
 ): Promise<GenerateStylePreviewResult> {
   const { diagnosis, recommendation } = input;
 
-  const prompt = buildStylePreviewPrompt({
-    gender: diagnosis.gender,
-    age: diagnosis.age,
-    title: recommendation.title,
-    description: recommendation.description,
-    summary: recommendation.summary,
-    clothingAdvice: recommendation.clothingAdvice,
-    hairstyleAdvice: recommendation.hairstyleAdvice,
-    shoesAdvice: recommendation.shoesAdvice,
-    colorPalette: recommendation.colorPalette,
-  });
+  const prompt = recommendation.archetype
+    ? buildArchetypeStylePreviewPrompt({
+        gender: diagnosis.gender,
+        age: diagnosis.age,
+        bodyType: diagnosis.bodyType ?? null,
+        faceShape: diagnosis.faceShape ?? null,
+        archetype: recommendation.archetype,
+      })
+    : buildStylePreviewPrompt({
+        gender: diagnosis.gender,
+        age: diagnosis.age,
+        title: recommendation.title,
+        description: recommendation.description,
+        summary: recommendation.summary,
+        clothingAdvice: recommendation.clothingAdvice,
+        hairstyleAdvice: recommendation.hairstyleAdvice,
+        shoesAdvice: recommendation.shoesAdvice,
+        colorPalette: recommendation.colorPalette,
+      });
 
   const { provider, name } = dependencies.getProvider();
   let providerResult = await provider.generate({ prompt });

@@ -234,6 +234,39 @@ enum ImageStatus {
   FAILED
 }
 
+enum GenderScope {
+  MALE
+  FEMALE
+  UNISEX
+  OTHER
+}
+
+model StyleArchetype {
+  id                  String   @id @default(cuid())
+  slug                String   @unique
+  name                String
+  genderScope         GenderScope
+  category            String
+  description         String   @db.Text
+  personalityLabel    String?
+  keywords            String[]
+  clothingDNA         String   @db.Text
+  hairstyleDNA        String   @db.Text
+  shoesDNA            String   @db.Text
+  colorDNA            String[]
+  avoidDNA            String   @db.Text
+  imagePromptTemplate String   @db.Text
+  version             Int      @default(1)
+  active              Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  recommendations StyleRecommendation[]
+
+  @@index([genderScope, active])
+  @@index([category])
+}
+
 // AI-generated recommendations (placeholder for Sprint 2+)
 model StyleRecommendation {
   id              String         @id @default(cuid())
@@ -256,6 +289,11 @@ model StyleRecommendation {
   previewImageStatus  ImageStatus @default(PENDING)
   previewImagePrompt  String?     @db.Text
   previewImageError   String?
+
+  archetypeId String?
+  archetype   StyleArchetype? @relation(fields: [archetypeId], references: [id], onDelete: SetNull)
+
+  matchScore  Int?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
