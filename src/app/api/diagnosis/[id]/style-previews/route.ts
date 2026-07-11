@@ -10,6 +10,8 @@ interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
+export const maxDuration = 180;
+
 export async function POST(request: NextRequest, { params }: RouteContext) {
   try {
     const { id } = await params;
@@ -59,6 +61,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     let updated = 0;
     let skipped = diagnosis.recommendations.length - candidates.length;
     let failed = 0;
+    const claimedRecommendations = [];
 
     for (const rec of candidates) {
       const claim = await prisma.styleRecommendation.updateMany({
@@ -74,29 +77,34 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
         continue;
       }
 
-      try {
-        const result = await generateStylePreviewImage({
-          diagnosis: {
-            id: diagnosis.id,
-            gender: diagnosis.gender,
-            age: diagnosis.age,
-            heightCm: diagnosis.heightCm,
-            weightKg: diagnosis.weightKg,
-          },
-          recommendation: rec,
-        });
-        if (result.status === "COMPLETED") {
-          await prisma.styleRecommendation.update({
-            where: { id: rec.id },
-            data: {
-              previewImageUrl: result.url,
-              previewImageStatus: "COMPLETED",
-              previewImagePrompt: result.prompt,
-              previewImageError: null,
+      claimedRecommendations.push(rec);
+    }
+
+    const outcomes = await Promise.all(
+      claimedRecommendations.map(async (rec) => {
+        try {
+          const result = await generateStylePreviewImage({
+            diagnosis: {
+              id: diagnosis.id,
+              gender: diagnosis.gender,
+              age: diagnosis.age,
+              heightCm: diagnosis.heightCm,
+              weightKg: diagnosis.weightKg,
             },
+            recommendation: rec,
           });
-          updated++;
-        } else {
+          if (result.status === "COMPLETED") {
+            await prisma.styleRecommendation.update({
+              where: { id: rec.id },
+              data: {
+                previewImageUrl: result.url,
+                previewImageStatus: "COMPLETED",
+                previewImagePrompt: result.prompt,
+                previewImageError: null,
+              },
+            });
+            return "updated" as const;
+          }
           await prisma.styleRecommendation.update({
             where: { id: rec.id },
             data: {
@@ -105,17 +113,26 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
               previewImageError: result.error,
             },
           });
-          failed++;
+          return "failed" as const;
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : "Unknown generation error";
+          await prisma.styleRecommendation.update({
+            where: { id: rec.id },
+            data: {
+              previewImageStatus: "FAILED",
+              previewImageError: message,
+            },
+          });
+          return "failed" as const;
         }
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown generation error";
-        await prisma.styleRecommendation.update({
-          where: { id: rec.id },
-          data: {
-            previewImageStatus: "FAILED",
-            previewImageError: message,
-          },
-        });
+      })
+    );
+
+    for (const outcome of outcomes) {
+      if (outcome === "updated") {
+        updated++;
+      } else {
         failed++;
       }
     }

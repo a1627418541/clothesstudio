@@ -30,6 +30,36 @@ describe("parseStylePreviewResponse", () => {
     ).toEqual({ url: null, base64: "images-base64" });
   });
 
+  it("parses an EvoLink asynchronous task response", () => {
+    expect(
+      parseStylePreviewResponse({
+        id: "task-unified-123",
+        object: "image.generation.task",
+        status: "pending",
+        progress: 0,
+        task_info: { estimated_time: 100 },
+      })
+    ).toEqual({
+      taskId: "task-unified-123",
+      taskStatus: "pending",
+    });
+  });
+
+  it("parses a completed EvoLink task result URL", () => {
+    expect(
+      parseStylePreviewResponse({
+        id: "task-unified-123",
+        object: "image.generation.task",
+        status: "completed",
+        progress: 100,
+        results: ["https://provider.example.com/generated.png"],
+      })
+    ).toEqual({
+      url: "https://provider.example.com/generated.png",
+      base64: null,
+    });
+  });
+
   it("returns shape-only diagnostics without response values", () => {
     const secretValue = "secret-provider-value";
     const result = parseStylePreviewResponse({

@@ -1,5 +1,6 @@
 type ParsedStylePreviewResponse =
   | { url: string | null; base64: string | null }
+  | { taskId: string; taskStatus: string }
   | { error: string };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -37,11 +38,26 @@ export function parseStylePreviewResponse(
   }
 
   const item = firstRecord(value.data) ?? firstRecord(value.images);
-  const url = stringValue(item, ["url"]);
+  const resultUrl =
+    Array.isArray(value.results) && typeof value.results[0] === "string"
+      ? value.results[0]
+      : null;
+  const url = resultUrl ?? stringValue(item, ["url"]);
   const base64 = stringValue(item, ["b64_json", "base64"]);
 
   if (url || base64) {
     return { url, base64 };
+  }
+
+  if (
+    value.object === "image.generation.task" &&
+    typeof value.id === "string" &&
+    typeof value.status === "string"
+  ) {
+    return {
+      taskId: value.id,
+      taskStatus: value.status,
+    };
   }
 
   const topLevelKeys = Object.keys(value).sort().join(", ") || "none";
