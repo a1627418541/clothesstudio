@@ -1,4 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { RecommendationMeta } from "./recommendation-meta";
 import { ReportCover } from "./report-cover";
@@ -55,5 +57,15 @@ describe("editorial report components", () => {
     expect(html).toContain("July 13, 2026");
     expect(html).toContain("178 cm");
     expect(html).toContain("Report ready");
+  });
+
+  it("does not advertise an unavailable transformation image", () => {
+    const source = readFileSync(
+      resolve("src/app/diagnosis/[id]/page.tsx"),
+      "utf8"
+    );
+
+    expect(source).not.toMatch(/transformation image|Coming Soon/i);
+    expect(source).toContain("Retry Failed Previews");
   });
 });

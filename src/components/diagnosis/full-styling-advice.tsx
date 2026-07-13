@@ -1,100 +1,41 @@
-import { Shirt, Sparkles, Footprints, Palette, Ban } from "lucide-react";
-import { ColorPalette } from "./color-palette";
+import { Footprints, Scissors, Shirt } from "lucide-react";
+import { EditorialLabel } from "@/components/ui/editorial-label";
 import { ReportRecommendation } from "@/types/diagnosis";
+import { ColorPalette } from "./color-palette";
+import { RecommendationMeta } from "./recommendation-meta";
 
-type Recommendation = ReportRecommendation;
+const adviceBlocks = [
+  ["clothingAdvice", "Outfit", Shirt],
+  ["hairstyleAdvice", "Hair", Scissors],
+  ["shoesAdvice", "Shoes", Footprints],
+] as const;
 
-interface FullStylingAdviceProps {
-  recommendations: Recommendation[];
-}
-
-const ADVICE_BLOCKS: {
-  key: keyof Pick<Recommendation, "clothingAdvice" | "hairstyleAdvice" | "shoesAdvice">;
-  label: string;
-  icon: React.ReactNode;
-}[] = [
-  { key: "clothingAdvice", label: "Outfit Direction", icon: <Shirt className="h-4 w-4" /> },
-  { key: "hairstyleAdvice", label: "Hairstyle Direction", icon: <Sparkles className="h-4 w-4" /> },
-  { key: "shoesAdvice", label: "Shoe Suggestions", icon: <Footprints className="h-4 w-4" /> },
-];
-
-export function FullStylingAdvice({ recommendations }: FullStylingAdviceProps) {
+export function FullStylingAdvice({ recommendations }: { recommendations: ReportRecommendation[] }) {
   return (
-    <section className="mb-8">
-      <p className="mb-4 text-xs font-semibold uppercase tracking-wide text-[#6F6A63]">
-        Full Styling Advice
-      </p>
-
-      <div className="space-y-6">
-        {recommendations.map((rec) => (
-          <article key={rec.id} className="rounded-3xl border border-[#E8E2DA] bg-white p-5 shadow-sm md:p-6">
-            <div className="mb-4 flex items-center gap-3">
-              <span
-                className={[
-                  "rounded-full px-3 py-1 text-xs font-medium",
-                  rec.isPrimary
-                    ? "bg-[#B85C4F] text-white"
-                    : "bg-[#F2F0EC] text-[#6F6A63]",
-                ].join(" ")}
-              >
-                {rec.isPrimary ? "Primary" : `Option ${rec.rank}`}
-              </span>
-              <h3 className="text-lg font-semibold text-[#181614]">{rec.title}</h3>
-            </div>
-
-            {rec.archetype && (
-              <div className="mb-4 flex flex-wrap items-center gap-2">
-                <span className="text-xs font-medium text-[#B85C4F]">
-                  {rec.archetype.name}
-                </span>
-                {rec.archetype.personalityLabel && (
-                  <span className="text-xs text-[#6F6A63]">
-                    {rec.archetype.personalityLabel}
-                  </span>
-                )}
-                <span className="text-xs text-[#6F6A63]">{" · "}{rec.archetype.category}</span>
-                {rec.matchScore !== null && (
-                  <span className="text-xs text-[#2E7D5A]">{" · "}{rec.matchScore}% match</span>
-                )}
+    <section className="mb-14">
+      <EditorialLabel>Full styling advice</EditorialLabel>
+      <div className="mt-5 space-y-8">
+        {recommendations.map((recommendation) => (
+          <article key={recommendation.id} className="border border-[var(--line)] bg-[var(--surface)] p-8">
+            <div className="flex items-start justify-between gap-8 border-b border-[var(--line)] pb-6">
+              <div>
+                <p className="text-xs uppercase tracking-[0.16em] text-[var(--oxblood)]">{recommendation.isPrimary ? "Primary direction" : `Direction ${String(recommendation.rank).padStart(2, "0")}`}</p>
+                <h3 className="mt-2 font-editorial text-4xl font-medium">{recommendation.title}</h3>
               </div>
-            )}
-
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-              {ADVICE_BLOCKS.map(({ key, label, icon }) => (
-                <div key={key} className="rounded-xl bg-[#FAFAF8] p-4">
-                  <div className="mb-2 flex items-center gap-2 text-[#B85C4F]">
-                    {icon}
-                    <span className="text-xs font-semibold uppercase tracking-wide">{label}</span>
-                  </div>
-                  <p className="line-clamp-5 text-sm leading-relaxed text-[#181614]">{rec[key]}</p>
+              <div className="w-[430px]"><RecommendationMeta archetype={recommendation.archetype} matchScore={recommendation.matchScore} compact /></div>
+            </div>
+            <div className="mt-7 grid grid-cols-3 divide-x divide-[var(--line)]">
+              {adviceBlocks.map(([key, label, Icon], index) => (
+                <div key={key} className={index === 0 ? "pr-6" : index === 2 ? "pl-6" : "px-6"}>
+                  <div className="flex items-center gap-2 text-[var(--oxblood)]"><Icon className="h-4 w-4" aria-hidden="true" /><span className="text-xs font-semibold uppercase tracking-[0.14em]">{label}</span></div>
+                  <p className="mt-4 text-sm leading-7 text-[var(--muted-ink)]">{recommendation[key]}</p>
                 </div>
               ))}
             </div>
-
-            <div className="mt-4">
-              <div className="mb-2 flex items-center gap-2 text-[#181614]">
-                <Palette className="h-4 w-4 text-[#B85C4F]" />
-                <span className="text-sm font-semibold">Recommended Colors</span>
-              </div>
-              <ColorPalette colors={rec.colorPalette} />
+            <div className="mt-7 grid grid-cols-[1fr_1fr] gap-10 border-t border-[var(--line)] pt-6">
+              <div><p className="mb-4 text-xs font-semibold uppercase tracking-[0.14em]">Recommended colors</p><ColorPalette colors={recommendation.colorPalette} /></div>
+              {recommendation.avoidTips.length > 0 ? <div><p className="mb-4 text-xs font-semibold uppercase tracking-[0.14em]">Avoid</p><p className="text-sm leading-6 text-[var(--muted-ink)]">{recommendation.avoidTips.join(" · ")}</p></div> : null}
             </div>
-
-            {rec.avoidTips.length > 0 && (
-              <div className="mt-4 rounded-xl border border-[#E8E2DA] bg-[#FFF9F7] p-4">
-                <div className="mb-2 flex items-center gap-2 text-[#181614]">
-                  <Ban className="h-4 w-4 text-[#B85C4F]" />
-                  <span className="text-sm font-semibold">Avoid</span>
-                </div>
-                <ul className="grid grid-cols-1 gap-1 sm:grid-cols-2">
-                  {rec.avoidTips.map((tip, index) => (
-                    <li key={index} className="flex items-start gap-2 text-sm text-[#6F6A63]">
-                      <span className="mt-1.5 h-1 w-1 flex-shrink-0 rounded-full bg-[#C73E3E]" />
-                      {tip}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
           </article>
         ))}
       </div>
