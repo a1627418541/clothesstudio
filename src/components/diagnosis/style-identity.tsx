@@ -1,4 +1,4 @@
-import { Sparkles } from "lucide-react";
+import { EditorialLabel } from "@/components/ui/editorial-label";
 
 interface StyleIdentityProps {
   bodyType: string | null;
@@ -7,50 +7,41 @@ interface StyleIdentityProps {
   summary: string | null;
 }
 
-export function StyleIdentity({ bodyType, faceShape, vibeKeywords, summary }: StyleIdentityProps) {
+export function StyleIdentity({
+  bodyType,
+  faceShape,
+  vibeKeywords,
+  summary,
+}: StyleIdentityProps) {
+  const identity = vibeKeywords[0] ?? bodyType ?? "Custom style";
+
   return (
-    <section className="mb-8 rounded-3xl border border-[#E8E2DA] bg-white p-6 shadow-sm md:p-8">
-      <div className="mb-5 flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#FFF9F7] text-[#B85C4F]">
-          <Sparkles className="h-5 w-5" />
-        </div>
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-[#6F6A63]">AI Style Identity</p>
-          <h2 className="text-lg font-semibold text-[#181614] md:text-xl">{bodyType ?? "Custom Style"}</h2>
-        </div>
+    <section className="my-10 grid grid-cols-12 gap-10 border-y border-[var(--line)] py-9">
+      <div className="col-span-4">
+        <EditorialLabel>Style identity</EditorialLabel>
+        <h2 className="mt-5 font-editorial text-5xl font-medium capitalize leading-none text-[var(--ink)]">
+          {identity}
+        </h2>
       </div>
-
-      {summary && (
-        <p className="mb-4 leading-relaxed text-[#6F6A63]">{summary}</p>
-      )}
-
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <div className="rounded-xl bg-[#FAFAF8] p-3">
-          <p className="text-xs text-[#6F6A63]">Body Proportion</p>
-          <p className="mt-0.5 font-medium text-[#181614]">{bodyType ?? "N/A"}</p>
-        </div>
-        <div className="rounded-xl bg-[#FAFAF8] p-3">
-          <p className="text-xs text-[#6F6A63]">Face Shape</p>
-          <p className="mt-0.5 font-medium text-[#181614]">{faceShape ?? "N/A"}</p>
-        </div>
-        <div className="col-span-2 rounded-xl bg-[#FAFAF8] p-3 sm:col-span-1">
-          <p className="text-xs text-[#6F6A63]">Style Vibe</p>
-          <p className="mt-0.5 font-medium text-[#181614]">{vibeKeywords.length > 0 ? vibeKeywords[0] : "N/A"}</p>
-        </div>
+      <div className="col-span-8">
+        {summary ? (
+          <p className="max-w-3xl text-lg leading-8 text-[var(--muted-ink)]">{summary}</p>
+        ) : null}
+        <dl className="mt-7 grid grid-cols-3 border-t border-[var(--line)]">
+          <div className="border-r border-[var(--line)] py-4 pr-5">
+            <dt className="text-[0.65rem] uppercase tracking-[0.14em] text-[var(--muted-ink)]">Body proportion</dt>
+            <dd className="mt-2 font-semibold capitalize text-[var(--ink)]">{bodyType ?? "N/A"}</dd>
+          </div>
+          <div className="border-r border-[var(--line)] px-5 py-4">
+            <dt className="text-[0.65rem] uppercase tracking-[0.14em] text-[var(--muted-ink)]">Face shape</dt>
+            <dd className="mt-2 font-semibold capitalize text-[var(--ink)]">{faceShape ?? "N/A"}</dd>
+          </div>
+          <div className="py-4 pl-5">
+            <dt className="text-[0.65rem] uppercase tracking-[0.14em] text-[var(--muted-ink)]">Style cues</dt>
+            <dd className="mt-2 font-semibold capitalize text-[var(--ink)]">{vibeKeywords.length > 0 ? vibeKeywords.join(" · ") : "N/A"}</dd>
+          </div>
+        </dl>
       </div>
-
-      {vibeKeywords.length > 0 && (
-        <div className="mt-4 flex flex-wrap gap-2">
-          {vibeKeywords.map((keyword, index) => (
-            <span
-              key={index}
-              className="rounded-full border border-[#E8E2DA] bg-[#FAFAF8] px-3 py-1 text-xs font-medium text-[#181614]"
-            >
-              {keyword}
-            </span>
-          ))}
-        </div>
-      )}
     </section>
   );
 }
