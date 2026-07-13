@@ -1,8 +1,19 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --paper: #f4efe7;
+  --surface: #fffdf9;
+  --ink: #151311;
+  --muted-ink: #6f685f;
+  --line: #d9d0c4;
+  --soft-line: #e9e2d8;
+  --oxblood: #7b2636;
+  --oxblood-hover: #611c2a;
+  --success: #37634d;
+  --warning: #8b641f;
+  --error: #9a3d3d;
+  --background: var(--paper);
+  --foreground: var(--ink);
 }
 
 @theme inline {
@@ -12,15 +23,109 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  background: var(--paper);
+  scroll-behavior: smooth;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Arial, sans-serif;
+}
+
+::selection {
+  background: #dec7cb;
+  color: var(--ink);
+}
+
+.font-editorial {
+  font-family: var(--font-editorial), Georgia, serif;
+}
+
+.editorial-shell {
+  width: min(calc(100% - 64px), 1320px);
+  margin-inline: auto;
+}
+
+.editorial-surface {
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.editorial-rule {
+  border-color: var(--line);
+}
+
+.editorial-button,
+.editorial-button-secondary {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 2px;
+  padding: 0.75rem 1.25rem;
+  font-weight: 600;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease,
+    transform 180ms ease;
+}
+
+.editorial-button {
+  background: var(--oxblood);
+  color: #fff;
+}
+
+.editorial-button:hover {
+  background: var(--oxblood-hover);
+  transform: translateY(-1px);
+}
+
+.editorial-button-secondary {
+  border: 1px solid var(--ink);
+  color: var(--ink);
+}
+
+.editorial-button-secondary:hover {
+  border-color: var(--oxblood);
+  color: var(--oxblood);
+}
+
+.editorial-field {
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: var(--surface);
+  padding: 0.75rem 1rem;
+  color: var(--ink);
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.editorial-field:hover {
+  border-color: #b9ac9d;
+}
+
+:where(a, button, input, select, summary, [role="button"]):focus-visible {
+  outline: 2px solid var(--oxblood);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

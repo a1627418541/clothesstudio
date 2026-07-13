@@ -1,47 +1,32 @@
-interface Photo {
-  role: string;
-  url: string | null;
-}
+import { EditorialLabel } from "@/components/ui/editorial-label";
 
 interface UploadedPhotosProps {
-  photos: Photo[];
+  photos: { role: string; url: string | null }[];
 }
 
+const roleLabels: Record<string, string> = {
+  FACE_FRONT: "Front face",
+  FACE_SIDE: "Side profile",
+  FULL_BODY: "Full body",
+};
+
 export function UploadedPhotos({ photos }: UploadedPhotosProps) {
-  const roleLabels: Record<string, string> = {
-    FACE_FRONT: "Front Face",
-    FACE_SIDE: "Side Face",
-    FULL_BODY: "Full Body",
-  };
-
   return (
-    <section className="mb-8">
-      <p className="mb-4 text-xs font-semibold uppercase tracking-wide text-[#6F6A63]">
-        Uploaded Photos
-      </p>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+    <section className="mb-14">
+      <EditorialLabel>Source photographs</EditorialLabel>
+      <div className="mt-5 grid grid-cols-3 gap-5">
         {photos.map((photo) => (
-          <div
-            key={photo.role}
-            className="overflow-hidden rounded-2xl border border-[#E8E2DA] bg-white"
-          >
+          <figure key={photo.role} className="border border-[var(--line)] bg-[var(--surface)]">
             {photo.url ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={photo.url}
-                alt={roleLabels[photo.role] || photo.role}
-                className="aspect-square w-full object-cover"
-              />
+              <img src={photo.url} alt={roleLabels[photo.role] || photo.role} className="aspect-[4/5] w-full object-cover" />
             ) : (
-              <div className="flex aspect-square items-center justify-center bg-[#FAFAF8] text-sm text-[#6F6A63]">
-                Image unavailable
-              </div>
+              <div className="flex aspect-[4/5] items-center justify-center bg-[#ebe5dc] text-sm text-[var(--muted-ink)]">Image unavailable</div>
             )}
-            <div className="p-3">
-              <p className="text-xs font-medium text-[#6F6A63]">{roleLabels[photo.role] || photo.role}</p>
-            </div>
-          </div>
+            <figcaption className="border-t border-[var(--line)] px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--muted-ink)]">
+              {roleLabels[photo.role] || photo.role}
+            </figcaption>
+          </figure>
         ))}
       </div>
     </section>

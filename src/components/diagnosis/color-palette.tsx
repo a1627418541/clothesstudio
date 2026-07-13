@@ -4,24 +4,21 @@ interface ColorPaletteProps {
 
 export function ColorPalette({ colors }: ColorPaletteProps) {
   if (!colors || colors.length === 0) {
-    return <p className="text-sm text-[#6B6B6B]">No color guidance available.</p>;
+    return <p className="text-sm text-[var(--muted-ink)]">No color guidance available.</p>;
   }
 
   return (
-    <div className="flex flex-wrap gap-2">
+    <ul className="flex flex-wrap gap-x-4 gap-y-3" aria-label="Recommended colors">
       {colors.map((color, index) => (
-        <div
-          key={index}
-          className="flex items-center gap-2 rounded-full border border-[#E8E6E1] bg-white px-3 py-1.5 text-sm text-[#1A1A1A]"
-        >
+        <li key={`${color}-${index}`} className="flex items-center gap-2 text-sm text-[var(--ink)]">
           <span
-            className="inline-block h-4 w-4 rounded-full border border-[#E8E6E1]"
+            className="h-5 w-5 border border-black/15"
             style={{ backgroundColor: color }}
             aria-hidden="true"
           />
           <span className="capitalize">{color}</span>
-        </div>
+        </li>
       ))}
-    </div>
+    </ul>
   );
 }

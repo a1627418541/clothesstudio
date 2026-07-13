@@ -1,14 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { ArrowLeft, Calendar, Loader2 } from "lucide-react";
-import { StyleIdentity } from "@/components/diagnosis/style-identity";
-import { PrimaryStyleDirection } from "@/components/diagnosis/primary-style-direction";
+import { Loader2 } from "lucide-react";
 import { AlternativeStyleCard } from "@/components/diagnosis/alternative-style-card";
 import { FullStylingAdvice } from "@/components/diagnosis/full-styling-advice";
+import { PrimaryStyleDirection } from "@/components/diagnosis/primary-style-direction";
+import { ReportCover } from "@/components/diagnosis/report-cover";
+import { StyleIdentity } from "@/components/diagnosis/style-identity";
 import { UploadedPhotos } from "@/components/diagnosis/uploaded-photos";
+import { EditorialLabel } from "@/components/ui/editorial-label";
+import { SiteHeader } from "@/components/ui/site-header";
 import { shouldAutoGenerateStylePreviews } from "@/lib/ai/style-preview-policy";
 import { ReportRecommendation } from "@/types/diagnosis";
 
@@ -25,34 +28,22 @@ interface DiagnosisDetail {
   summary: string | null;
   createdAt: string;
   photos: { role: string; url: string | null }[];
-  recommendations: Recommendation[];
-}
-
-type Recommendation = ReportRecommendation;
-
-function InfoPill({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="rounded-xl border border-[#E8E2DA] bg-white px-4 py-3">
-      <p className="text-xs text-[#6F6A63]">{label}</p>
-      <p className="mt-0.5 text-sm font-medium text-[#181614]">{value}</p>
-    </div>
-  );
+  recommendations: ReportRecommendation[];
 }
 
 function ReportError({ message }: { message: string }) {
   return (
-    <main className="min-h-screen bg-[#FAFAF8] px-4 py-10">
-      <div className="mx-auto max-w-2xl rounded-3xl border border-[#E8E2DA] bg-white p-8 text-center shadow-sm">
-        <h1 className="mb-2 text-xl font-semibold text-[#181614]">Report Unavailable</h1>
-        <p className="mb-6 text-[#6F6A63]">{message}</p>
-        <Link
-          href="/diagnosis"
-          className="inline-flex items-center gap-2 rounded-full bg-[#B85C4F] px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#9A4A3F]"
-        >
-          Start a New Diagnosis
-        </Link>
-      </div>
-    </main>
+    <div className="min-h-screen bg-[var(--paper)]">
+      <SiteHeader actionHref="/diagnosis" actionLabel="New diagnosis" compact />
+      <main className="editorial-shell py-20">
+        <section className="mx-auto max-w-3xl border border-[var(--line)] bg-[var(--surface)] p-10 text-center">
+          <EditorialLabel>Report unavailable</EditorialLabel>
+          <h1 className="mt-7 font-editorial text-5xl font-medium">This edition could not be opened.</h1>
+          <p className="mx-auto mt-5 max-w-xl leading-7 text-[var(--muted-ink)]">{message}</p>
+          <Link href="/diagnosis" className="editorial-button mt-8 px-7">Start a new diagnosis</Link>
+        </section>
+      </main>
+    </div>
   );
 }
 
@@ -68,49 +59,43 @@ export default function DiagnosisDetailPage() {
 
   const fetchDiagnosis = useCallback(async () => {
     try {
-      const res = await fetch(`/api/diagnosis/${id}`);
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to load report");
-      }
-
+      const response = await fetch(`/api/diagnosis/${id}`);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed to load report");
       setDiagnosis(data.diagnosis);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to load report";
-      setError(message);
+    } catch (fetchError) {
+      setError(fetchError instanceof Error ? fetchError.message : "Failed to load report");
     } finally {
       setLoading(false);
     }
   }, [id]);
 
   useEffect(() => {
-    fetchDiagnosis();
+    void fetchDiagnosis();
   }, [fetchDiagnosis]);
 
   const requestStylePreviews = useCallback(
     async (retryFailed: boolean) => {
       if (isGeneratingPreviews) return;
-
       setIsGeneratingPreviews(true);
       setPreviewGenerationError(null);
 
       try {
         const query = retryFailed ? "?retryFailed=true" : "";
-        const res = await fetch(`/api/diagnosis/${id}/style-previews${query}`, {
+        const response = await fetch(`/api/diagnosis/${id}/style-previews${query}`, {
           method: "POST",
         });
-        const data = await res.json();
-
-        if (!res.ok || !data.ok) {
+        const data = await response.json();
+        if (!response.ok || !data.ok) {
           throw new Error(data.error || "Style preview generation failed");
         }
-
         await fetchDiagnosis();
-      } catch (err) {
-        const message =
-          err instanceof Error ? err.message : "Style preview generation failed";
-        setPreviewGenerationError(message);
+      } catch (generationError) {
+        setPreviewGenerationError(
+          generationError instanceof Error
+            ? generationError.message
+            : "Style preview generation failed"
+        );
       } finally {
         setIsGeneratingPreviews(false);
       }
@@ -120,16 +105,15 @@ export default function DiagnosisDetailPage() {
 
   useEffect(() => {
     if (!diagnosis || isGeneratingPreviews) return;
-
     if (!shouldAutoGenerateStylePreviews(diagnosis.recommendations)) return;
-
     void requestStylePreviews(false);
   }, [diagnosis, isGeneratingPreviews, requestStylePreviews]);
 
   if (loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#FAFAF8]">
-        <Loader2 className="h-8 w-8 animate-spin text-[#B85C4F]" />
+      <main className="flex min-h-screen flex-col items-center justify-center bg-[var(--paper)]" role="status">
+        <Loader2 className="h-8 w-8 animate-spin text-[var(--oxblood)]" aria-hidden="true" />
+        <p className="mt-4 text-xs uppercase tracking-[0.14em] text-[var(--muted-ink)]">Opening your report…</p>
       </main>
     );
   }
@@ -138,10 +122,14 @@ export default function DiagnosisDetailPage() {
     return <ReportError message={error ?? "Report not found"} />;
   }
 
-  const primaryRec = diagnosis.recommendations.find((r) => r.isPrimary) ?? diagnosis.recommendations[0];
-  const alternatives = diagnosis.recommendations.filter((r) => !r.isPrimary);
+  const primaryRecommendation =
+    diagnosis.recommendations.find((recommendation) => recommendation.isPrimary) ??
+    diagnosis.recommendations[0];
+  const alternatives = diagnosis.recommendations.filter(
+    (recommendation) => !recommendation.isPrimary
+  );
   const hasFailedPreviews = diagnosis.recommendations.some(
-    (rec) => rec.previewImageStatus === "FAILED"
+    (recommendation) => recommendation.previewImageStatus === "FAILED"
   );
   const createdAt = new Date(diagnosis.createdAt).toLocaleDateString("en-US", {
     year: "numeric",
@@ -150,40 +138,17 @@ export default function DiagnosisDetailPage() {
   });
 
   return (
-    <main className="min-h-screen bg-[#FAFAF8] px-4 py-6 md:py-10">
-      <div className="mx-auto max-w-5xl">
-        <header className="mb-6 md:mb-8">
-          <Link
-            href="/diagnosis"
-            className="mb-4 inline-flex items-center gap-1 text-sm font-medium text-[#6F6A63] transition-colors hover:text-[#B85C4F]"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            New diagnosis
-          </Link>
-          <h1 className="text-2xl font-semibold text-[#181614] md:text-3xl">Your AI Style Report</h1>
-          <p className="mt-1 text-[#6F6A63]">
-            A personalized style direction based on your photos and basic profile.
-          </p>
-          <div className="mt-3 flex flex-wrap items-center gap-3">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#FFF9F7] px-3 py-1 text-xs font-medium text-[#B85C4F]">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#2E7D5A]" />
-              Preview Ready
-            </span>
-            <span className="flex items-center gap-1 text-sm text-[#6F6A63]">
-              <Calendar className="h-4 w-4" />
-              {createdAt}
-            </span>
-          </div>
-        </header>
-
-        <section className="mb-6 rounded-2xl border border-[#E8E2DA] bg-white p-4 shadow-sm">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <InfoPill label="Gender" value={diagnosis.gender} />
-            <InfoPill label="Age" value={`${diagnosis.age} yrs`} />
-            <InfoPill label="Height" value={`${diagnosis.heightCm} cm`} />
-            <InfoPill label="Weight" value={`${diagnosis.weightKg} kg`} />
-          </div>
-        </section>
+    <div className="min-h-screen bg-[var(--paper)]">
+      <SiteHeader actionHref="/diagnosis" actionLabel="New diagnosis" compact />
+      <main className="editorial-shell max-w-[1240px] py-12">
+        <ReportCover
+          createdAt={createdAt}
+          gender={diagnosis.gender}
+          age={diagnosis.age}
+          heightCm={diagnosis.heightCm}
+          weightKg={diagnosis.weightKg}
+          status={diagnosis.status}
+        />
 
         <StyleIdentity
           bodyType={diagnosis.bodyType}
@@ -192,71 +157,62 @@ export default function DiagnosisDetailPage() {
           summary={diagnosis.summary}
         />
 
-        {primaryRec && <PrimaryStyleDirection recommendation={primaryRec} />}
+        {primaryRecommendation ? (
+          <PrimaryStyleDirection recommendation={primaryRecommendation} />
+        ) : null}
 
-        {alternatives.length > 0 && (
-          <section className="mb-8">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#6F6A63]">
-              Alternative Style Directions
-            </p>
-            <p className="mb-4 text-sm text-[#6F6A63]">
-              Two different directions you can choose from depending on the occasion.
-            </p>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              {alternatives.map((rec, index) => (
-                <AlternativeStyleCard key={rec.id} recommendation={rec} rank={index + 1} />
+        {alternatives.length > 0 ? (
+          <section className="mb-14">
+            <div className="flex items-end justify-between">
+              <div>
+                <EditorialLabel>Alternative directions</EditorialLabel>
+                <h2 className="mt-5 font-editorial text-5xl font-medium">Two more ways forward.</h2>
+              </div>
+              <p className="max-w-sm text-right text-sm leading-6 text-[var(--muted-ink)]">
+                Choose according to setting and mood while keeping the same underlying style logic.
+              </p>
+            </div>
+            <div className="mt-7 grid grid-cols-2 gap-6">
+              {alternatives.map((recommendation, index) => (
+                <AlternativeStyleCard
+                  key={recommendation.id}
+                  recommendation={recommendation}
+                  rank={index + 1}
+                />
               ))}
             </div>
           </section>
-        )}
+        ) : null}
 
         <FullStylingAdvice recommendations={diagnosis.recommendations} />
-
         <UploadedPhotos photos={diagnosis.photos} />
 
-        {hasFailedPreviews && (
-          <section className="mb-8 rounded-2xl border border-[#E8E2DA] bg-white p-5 text-center">
-            <p className="text-sm text-[#6F6A63]">
-              One or more style previews could not be generated. They will not retry
-              automatically.
+        {hasFailedPreviews ? (
+          <section className="mb-14 border border-[var(--line)] bg-[var(--surface)] p-8 text-center">
+            <EditorialLabel>Preview status</EditorialLabel>
+            <p className="mx-auto mt-5 max-w-xl text-sm leading-6 text-[var(--muted-ink)]">
+              One or more style previews could not be generated. Failed previews never retry automatically.
             </p>
-            {previewGenerationError && (
-              <p className="mt-2 text-sm text-[#C73E3E]">{previewGenerationError}</p>
-            )}
+            {previewGenerationError ? (
+              <p className="mt-3 text-sm text-[var(--error)]" role="alert">{previewGenerationError}</p>
+            ) : null}
             <button
               type="button"
               disabled={isGeneratingPreviews}
               onClick={() => void requestStylePreviews(true)}
-              className="mt-4 inline-flex items-center justify-center gap-2 rounded-full bg-[#B85C4F] px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#9A4A3F] disabled:cursor-not-allowed disabled:opacity-60"
+              className="editorial-button mt-6 px-7 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {isGeneratingPreviews && <Loader2 className="h-4 w-4 animate-spin" />}
+              {isGeneratingPreviews ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
               Retry Failed Previews
             </button>
           </section>
-        )}
+        ) : null}
 
-        <section className="mb-8 rounded-3xl border border-[#E8E2DA] bg-white p-6 text-center shadow-sm md:p-8">
-          <h2 className="text-lg font-semibold text-[#181614]">Want to see yourself in this style?</h2>
-          <p className="mx-auto mt-2 max-w-md text-sm text-[#6F6A63]">
-            Next, you&apos;ll be able to generate a personalized transformation image based on this style report.
-          </p>
-          <div className="mt-5 flex flex-col items-center gap-3">
-            <button
-              type="button"
-              disabled
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-[#E8E2DA] px-8 py-3 text-sm font-medium text-[#9B9B9B] cursor-not-allowed"
-            >
-              Transformation Image — Coming Soon
-            </button>
-            <Link
-              href="/diagnosis"
-              className="text-sm font-medium text-[#B85C4F] hover:text-[#9A4A3F]"
-            >
-              Start a New Diagnosis
-            </Link>
-          </div>
-        </section>
-      </div>
-    </main>
+        <div className="flex items-center justify-between border-t border-[var(--line)] py-8">
+          <p className="text-xs uppercase tracking-[0.14em] text-[var(--muted-ink)]">End of personal edition</p>
+          <Link href="/diagnosis" className="text-sm font-semibold text-[var(--oxblood)] hover:text-[var(--oxblood-hover)]">Start a new diagnosis</Link>
+        </div>
+      </main>
+    </div>
   );
 }
