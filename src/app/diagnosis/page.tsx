@@ -2,10 +2,13 @@
 
 import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
-import { ArrowRight, Check, ChevronLeft, Loader2, Sparkles, User } from "lucide-react";
+import { ArrowLeft, ArrowRight, Loader2, User } from "lucide-react";
 import { diagnosisFormSchema, DiagnosisFormInput } from "@/lib/validators/diagnosis";
 import { ZodError } from "zod";
 import { PhotoUploadCard } from "@/components/diagnosis/photo-upload-card";
+import { SiteHeader } from "@/components/ui/site-header";
+import { EditorialLabel } from "@/components/ui/editorial-label";
+import { DiagnosisProgress } from "@/components/diagnosis/diagnosis-progress";
 
 const ROLES = [
   { key: "FACE_FRONT" as const, label: "Front Face" },
@@ -194,268 +197,200 @@ export default function DiagnosisPage() {
   if (result) {
     const rec = result.primaryRecommendation;
     return (
-      <main className="min-h-screen bg-[#FAFAF8] px-4 py-10 md:px-6">
-        <div className="mx-auto max-w-2xl rounded-3xl border border-[#E8E6E1] bg-white p-6 text-center shadow-sm md:p-10">
-          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-[#FFF9F7] text-[#B85C4F]">
-            <Sparkles className="h-8 w-8" />
-          </div>
-          <h1 className="mb-2 text-2xl font-semibold text-[#1A1A1A] md:text-3xl">Your Style Report is Ready</h1>
-          <p className="mb-8 text-[#6B6B6B]">
-            We&apos;ve analyzed your photos and created a personalized style diagnosis.
-          </p>
-          <div className="mb-8 space-y-3 rounded-2xl bg-[#FAFAF8] p-5 text-left">
-            <h2 className="text-lg font-semibold text-[#1A1A1A]">{rec.title}</h2>
-            <p className="text-sm text-[#6B6B6B]">{rec.summary}</p>
-          </div>
-          <Link
-            href={`/diagnosis/${result.id}`}
-            className="inline-flex items-center justify-center gap-2 rounded-full bg-[#B85C4F] px-8 py-3 text-sm font-medium text-white transition-colors hover:bg-[#9A4A3F]"
-          >
-            View Full Report
-            <ArrowRight className="h-4 w-4" />
-          </Link>
-        </div>
-      </main>
+      <div className="min-h-screen bg-[var(--paper)]">
+        <SiteHeader actionHref="/diagnosis" actionLabel="New diagnosis" compact />
+        <main className="editorial-shell py-20">
+          <article className="mx-auto max-w-4xl border border-[var(--line)] bg-[var(--surface)] p-12 shadow-[0_28px_80px_rgba(50,39,29,0.1)]">
+            <EditorialLabel>Report complete</EditorialLabel>
+            <div className="mt-10 grid grid-cols-[1fr_260px] gap-12 border-y border-[var(--line)] py-10">
+              <div>
+                <h1 className="font-editorial text-6xl font-medium leading-[0.92] text-[var(--ink)]">
+                  Your personal style report is ready.
+                </h1>
+                <p className="mt-6 max-w-xl leading-7 text-[var(--muted-ink)]">
+                  Your photographs and profile have been translated into a clear primary direction and two alternatives.
+                </p>
+              </div>
+              <div className="border-l border-[var(--line)] pl-8">
+                <p className="text-xs uppercase tracking-[0.16em] text-[var(--muted-ink)]">Primary direction</p>
+                <h2 className="mt-4 font-editorial text-4xl font-medium text-[var(--oxblood)]">{rec.title}</h2>
+                <p className="mt-4 text-sm leading-6 text-[var(--muted-ink)]">{rec.summary}</p>
+              </div>
+            </div>
+            <div className="mt-8 flex items-center justify-between">
+              <p className="text-xs uppercase tracking-[0.16em] text-[var(--muted-ink)]">Edition prepared for this session</p>
+              <Link href={`/diagnosis/${result.id}`} className="editorial-button px-7">
+                View full report
+                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </Link>
+            </div>
+          </article>
+        </main>
+      </div>
     );
   }
 
   return (
-    <main className="min-h-screen bg-[#FAFAF8] px-4 py-6 md:py-10">
-      <div className="mx-auto max-w-3xl">
-        <header className="mb-8 flex items-center gap-3 md:mb-10">
-          <Link
-            href="/"
-            className="flex h-10 w-10 items-center justify-center rounded-full text-[#6B6B6B] transition-colors hover:bg-white hover:text-[#1A1A1A]"
-          >
-            <ChevronLeft className="h-5 w-5" />
-          </Link>
-          <div>
-            <h1 className="text-xl font-semibold text-[#1A1A1A] md:text-2xl">AI Style Studio</h1>
-            <p className="text-xs text-[#6B6B6B] md:text-sm">Personal style diagnosis powered by AI</p>
-          </div>
-        </header>
+    <div className="min-h-screen bg-[var(--paper)]">
+      <SiteHeader actionHref="/" actionLabel="Back home" compact />
+      <main className="py-14">
+        <div className="editorial-shell max-w-[1180px]">
+          <header className="mb-10 grid grid-cols-12 items-end gap-8">
+            <div className="col-span-7">
+              <EditorialLabel>Personal style diagnosis</EditorialLabel>
+              <h1 className="mt-5 font-editorial text-6xl font-medium leading-none text-[var(--ink)]">
+                Build your style profile.
+              </h1>
+            </div>
+            <p className="col-span-5 max-w-md justify-self-end text-sm leading-6 text-[var(--muted-ink)]">
+              Begin with three clear photographs, then add the practical details that shape proportion and context.
+            </p>
+          </header>
 
-        <div className="mb-8 flex items-center justify-center gap-2 text-sm">
-          {[
-            { id: "upload", label: "Upload Photos" },
-            { id: "info", label: "Your Profile" },
-            { id: "report", label: "Your Report" },
-          ].map((s, index) => {
-            const isActive = step === s.id || (s.id === "upload" && step === "upload") || (s.id === "info" && step === "info");
-            const isPast =
-              (s.id === "upload" && step === "info") ||
-              (s.id === "upload" && result) ||
-              (s.id === "info" && result);
-            return (
-              <div key={s.id} className="flex items-center gap-2">
-                <span
-                  className={[
-                    "flex h-7 w-7 items-center justify-center rounded-full text-xs font-medium",
-                    isActive
-                      ? "bg-[#B85C4F] text-white"
-                      : isPast
-                      ? "bg-[#2E7D5A] text-white"
-                      : "bg-[#E8E6E1] text-[#6B6B6B]",
-                  ].join(" ")}
-                >
-                  {isPast ? <Check className="h-3.5 w-3.5" /> : index + 1}
-                </span>
-                <span
-                  className={[
-                    "hidden font-medium md:inline",
-                    isActive || isPast ? "text-[#1A1A1A]" : "text-[#6B6B6B]",
-                  ].join(" ")}
-                >
-                  {s.label}
-                </span>
+          <DiagnosisProgress current={step} />
+
+          {sessionStatus === "error" ? (
+            <div className="mt-8 border border-[var(--error)] bg-[#fbf3f1] p-4 text-sm text-[var(--error)]" role="alert">
+              Failed to initialize the anonymous session. Refresh the page to try again.
+            </div>
+          ) : null}
+
+          {sessionStatus === "initializing" ? (
+            <div className="mt-8 flex items-center gap-3 border border-[var(--line)] bg-[var(--surface)] p-4 text-sm text-[var(--muted-ink)]" role="status">
+              <Loader2 className="h-4 w-4 animate-spin text-[var(--oxblood)]" aria-hidden="true" />
+              Initializing your private session…
+            </div>
+          ) : null}
+
+          {step === "upload" ? (
+            <section className="mt-10 grid grid-cols-12 gap-10 border-b border-[var(--line)] pb-12">
+              <div className="col-span-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--oxblood)]">Step 01</p>
+                <h2 className="mt-4 font-editorial text-4xl font-medium leading-none">Your photographs</h2>
+                <p className="mt-5 text-sm leading-6 text-[var(--muted-ink)]">
+                  Use recent, unfiltered photographs with your face and proportions clearly visible.
+                </p>
+                <ul className="mt-7 space-y-3 text-xs leading-5 text-[var(--muted-ink)]">
+                  <li>Natural, even light</li>
+                  <li>Simple background</li>
+                  <li>No beauty filters</li>
+                </ul>
               </div>
-            );
-          })}
+              <div className="col-span-9">
+                <div className="grid grid-cols-3 gap-5">
+                  {ROLES.map(({ key, label }) => (
+                    <PhotoUploadCard
+                      key={key}
+                      role={key}
+                      label={label}
+                      status={uploads[key].status}
+                      previewUrl={uploads[key].previewUrl}
+                      error={uploads[key].error}
+                      disabled={sessionStatus !== "ready"}
+                      onFileSelect={(file) => handleFileSelect(key, file)}
+                      onRetry={() => {
+                        setUploads((prev) => ({
+                          ...prev,
+                          [key]: { status: "idle", assetId: null, previewUrl: null, error: null },
+                        }));
+                      }}
+                    />
+                  ))}
+                </div>
+                {formErrors.photoAssetIds ? <p className="mt-4 text-sm text-[var(--error)]">{formErrors.photoAssetIds}</p> : null}
+                <div className="mt-8 flex items-center justify-between border-t border-[var(--line)] pt-6">
+                  <p className="text-xs text-[var(--muted-ink)]">
+                    {photosComplete ? "All three photographs are ready." : "Upload all three photographs to continue."}
+                  </p>
+                  <button type="button" disabled={!photosComplete} onClick={() => setStep("info")} className="editorial-button px-7 disabled:cursor-not-allowed disabled:opacity-40">
+                    Continue
+                    <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                </div>
+              </div>
+            </section>
+          ) : (
+            <section className="mt-10 grid grid-cols-12 gap-10 border-b border-[var(--line)] pb-12">
+              <aside className="col-span-4">
+                <button type="button" onClick={() => setStep("upload")} className="inline-flex items-center gap-2 text-sm font-semibold text-[var(--muted-ink)] hover:text-[var(--oxblood)]">
+                  <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+                  Back to photographs
+                </button>
+                <p className="mt-10 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--oxblood)]">Step 02</p>
+                <h2 className="mt-4 font-editorial text-5xl font-medium leading-none">Your profile</h2>
+                <p className="mt-5 max-w-sm text-sm leading-6 text-[var(--muted-ink)]">
+                  These practical measurements help the recommendation account for proportion. They do not change your uploaded photographs.
+                </p>
+              </aside>
+
+              <form onSubmit={handleSubmit} className="col-span-8 border border-[var(--line)] bg-[var(--surface)] p-8">
+                <div className="grid grid-cols-2 gap-6">
+                  <fieldset>
+                    <legend className="mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink)]">Gender</legend>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[{ value: "MALE", label: "Male" }, { value: "FEMALE", label: "Female" }, { value: "OTHER", label: "Other" }].map((option) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => setForm({ ...form, gender: option.value })}
+                          className={[
+                            "min-h-12 border px-3 text-sm font-semibold transition-colors",
+                            form.gender === option.value
+                              ? "border-[var(--oxblood)] bg-[#f7ecee] text-[var(--oxblood)]"
+                              : "border-[var(--line)] text-[var(--ink)] hover:border-[var(--oxblood)]",
+                          ].join(" ")}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                    {formErrors.gender ? <p id="gender-error" className="mt-2 text-sm text-[var(--error)]">{formErrors.gender}</p> : null}
+                  </fieldset>
+
+                  <div>
+                    <label htmlFor="age" className="mb-3 block text-xs font-semibold uppercase tracking-[0.14em]">Age</label>
+                    <div className="relative">
+                      <input id="age" type="number" min={13} max={80} value={form.age} onChange={(event) => setForm({ ...form, age: event.target.value })} className="editorial-field pr-14" placeholder="25" aria-describedby={formErrors.age ? "age-error" : undefined} />
+                      <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm text-[var(--muted-ink)]">yrs</span>
+                    </div>
+                    {formErrors.age ? <p id="age-error" className="mt-2 text-sm text-[var(--error)]">{formErrors.age}</p> : null}
+                  </div>
+
+                  <div>
+                    <label htmlFor="height" className="mb-3 block text-xs font-semibold uppercase tracking-[0.14em]">Height</label>
+                    <div className="relative">
+                      <User className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--muted-ink)]" aria-hidden="true" />
+                      <input id="height" type="number" min={120} max={230} value={form.heightCm} onChange={(event) => setForm({ ...form, heightCm: event.target.value })} className="editorial-field pl-11 pr-14" placeholder="170" aria-describedby={formErrors.heightCm ? "height-error" : undefined} />
+                      <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm text-[var(--muted-ink)]">cm</span>
+                    </div>
+                    {formErrors.heightCm ? <p id="height-error" className="mt-2 text-sm text-[var(--error)]">{formErrors.heightCm}</p> : null}
+                  </div>
+
+                  <div>
+                    <label htmlFor="weight" className="mb-3 block text-xs font-semibold uppercase tracking-[0.14em]">Weight</label>
+                    <div className="relative">
+                      <input id="weight" type="number" min={30} max={200} value={form.weightKg} onChange={(event) => setForm({ ...form, weightKg: event.target.value })} className="editorial-field pr-14" placeholder="65" aria-describedby={formErrors.weightKg ? "weight-error" : undefined} />
+                      <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm text-[var(--muted-ink)]">kg</span>
+                    </div>
+                    {formErrors.weightKg ? <p id="weight-error" className="mt-2 text-sm text-[var(--error)]">{formErrors.weightKg}</p> : null}
+                  </div>
+                </div>
+
+                {submitError ? <div className="mt-6 border border-[var(--error)] bg-[#fbf3f1] p-4 text-sm text-[var(--error)]" role="alert">{submitError}</div> : null}
+
+                <div className="mt-8 flex items-center justify-between border-t border-[var(--line)] pt-6">
+                  <p className="max-w-xs text-xs leading-5 text-[var(--muted-ink)]">
+                    Complete every field before generating the report.
+                  </p>
+                  <button type="submit" disabled={!canSubmit || submitting} className="editorial-button min-w-[230px] px-7 disabled:cursor-not-allowed disabled:opacity-40">
+                    {submitting ? <><Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />Analyzing your style…</> : <>Generate style report<ArrowRight className="h-4 w-4" aria-hidden="true" /></>}
+                  </button>
+                </div>
+              </form>
+            </section>
+          )}
         </div>
-
-        {sessionStatus === "error" && (
-          <div className="mb-6 rounded-2xl border border-[#C73E3E]/30 bg-[#FEF6F6] p-4 text-center text-sm text-[#C73E3E]">
-            Failed to initialize anonymous session. Please refresh.
-          </div>
-        )}
-
-        {sessionStatus === "initializing" && (
-          <div className="mb-6 flex items-center justify-center gap-2 rounded-2xl border border-[#E8E6E1] bg-white p-4 text-sm text-[#6B6B6B]">
-            <Loader2 className="h-4 w-4 animate-spin text-[#B85C4F]" />
-            Initializing session...
-          </div>
-        )}
-
-        {step === "upload" ? (
-          <section className="rounded-3xl border border-[#E8E6E1] bg-white p-5 shadow-sm md:p-8">
-            <div className="mb-6">
-              <h2 className="text-lg font-semibold text-[#1A1A1A] md:text-xl">Upload your photos</h2>
-              <p className="mt-1 text-sm text-[#6B6B6B]">
-                We need three photos to build an accurate style profile.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              {ROLES.map(({ key, label }) => (
-                <PhotoUploadCard
-                  key={key}
-                  role={key}
-                  label={label}
-                  status={uploads[key].status}
-                  previewUrl={uploads[key].previewUrl}
-                  error={uploads[key].error}
-                  disabled={sessionStatus !== "ready"}
-                  onFileSelect={(file) => handleFileSelect(key, file)}
-                  onRetry={() => {
-                    setUploads((prev) => ({
-                      ...prev,
-                      [key]: { status: "idle", assetId: null, previewUrl: null, error: null },
-                    }));
-                  }}
-                />
-              ))}
-            </div>
-
-            {formErrors.photoAssetIds && (
-              <p className="mt-4 text-sm text-[#C73E3E]">{formErrors.photoAssetIds}</p>
-            )}
-
-            <div className="mt-8 flex justify-end">
-              <button
-                type="button"
-                disabled={!photosComplete}
-                onClick={() => setStep("info")}
-                className="inline-flex items-center gap-2 rounded-full bg-[#B85C4F] px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#9A4A3F] disabled:cursor-not-allowed disabled:bg-[#E8E6E1] disabled:text-[#9B9B9B]"
-              >
-                Continue
-                <ArrowRight className="h-4 w-4" />
-              </button>
-            </div>
-          </section>
-        ) : (
-          <section className="rounded-3xl border border-[#E8E6E1] bg-white p-5 shadow-sm md:p-8">
-            <div className="mb-6">
-              <button
-                type="button"
-                onClick={() => setStep("upload")}
-                className="mb-3 text-sm font-medium text-[#6B6B6B] hover:text-[#B85C4F]"
-              >
-                ← Back to photos
-              </button>
-              <h2 className="text-lg font-semibold text-[#1A1A1A] md:text-xl">Tell us about yourself</h2>
-              <p className="mt-1 text-sm text-[#6B6B6B]">
-                This helps us tailor the recommendations to your body and lifestyle.
-              </p>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-5">
-              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-[#1A1A1A]">Gender</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { value: "MALE", label: "Male" },
-                      { value: "FEMALE", label: "Female" },
-                      { value: "OTHER", label: "Other" },
-                    ].map((option) => (
-                      <button
-                        key={option.value}
-                        type="button"
-                        onClick={() => setForm({ ...form, gender: option.value })}
-                        className={[
-                          "rounded-xl border px-3 py-2.5 text-sm font-medium transition-colors",
-                          form.gender === option.value
-                            ? "border-[#B85C4F] bg-[#FFF9F7] text-[#B85C4F]"
-                            : "border-[#E8E6E1] bg-white text-[#1A1A1A] hover:border-[#B85C4F]",
-                        ].join(" ")}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                  </div>
-                  {formErrors.gender && <p className="mt-1.5 text-sm text-[#C73E3E]">{formErrors.gender}</p>}
-                </div>
-
-                <div>
-                  <label htmlFor="age" className="mb-2 block text-sm font-medium text-[#1A1A1A]">Age</label>
-                  <div className="relative">
-                    <input
-                      id="age"
-                      type="number"
-                      min={13}
-                      max={80}
-                      value={form.age}
-                      onChange={(e) => setForm({ ...form, age: e.target.value })}
-                      className="w-full rounded-xl border border-[#E8E6E1] bg-white px-4 py-2.5 text-sm text-[#1A1A1A] outline-none transition-colors focus:border-[#B85C4F]"
-                      placeholder="25"
-                    />
-                    <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm text-[#6B6B6B]">yrs</span>
-                  </div>
-                  {formErrors.age && <p className="mt-1.5 text-sm text-[#C73E3E]">{formErrors.age}</p>}
-                </div>
-
-                <div>
-                  <label htmlFor="height" className="mb-2 block text-sm font-medium text-[#1A1A1A]">Height</label>
-                  <div className="relative">
-                    <User className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6B6B6B]" />
-                    <input
-                      id="height"
-                      type="number"
-                      min={120}
-                      max={230}
-                      value={form.heightCm}
-                      onChange={(e) => setForm({ ...form, heightCm: e.target.value })}
-                      className="w-full rounded-xl border border-[#E8E6E1] bg-white py-2.5 pl-10 pr-12 text-sm text-[#1A1A1A] outline-none transition-colors focus:border-[#B85C4F]"
-                      placeholder="170"
-                    />
-                    <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm text-[#6B6B6B]">cm</span>
-                  </div>
-                  {formErrors.heightCm && <p className="mt-1.5 text-sm text-[#C73E3E]">{formErrors.heightCm}</p>}
-                </div>
-
-                <div>
-                  <label htmlFor="weight" className="mb-2 block text-sm font-medium text-[#1A1A1A]">Weight</label>
-                  <div className="relative">
-                    <input
-                      id="weight"
-                      type="number"
-                      min={30}
-                      max={200}
-                      value={form.weightKg}
-                      onChange={(e) => setForm({ ...form, weightKg: e.target.value })}
-                      className="w-full rounded-xl border border-[#E8E6E1] bg-white px-4 py-2.5 pr-12 text-sm text-[#1A1A1A] outline-none transition-colors focus:border-[#B85C4F]"
-                      placeholder="65"
-                    />
-                    <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm text-[#6B6B6B]">kg</span>
-                  </div>
-                  {formErrors.weightKg && <p className="mt-1.5 text-sm text-[#C73E3E]">{formErrors.weightKg}</p>}
-                </div>
-              </div>
-
-              {submitError && (
-                <div className="rounded-xl border border-[#C73E3E]/30 bg-[#FEF6F6] p-4 text-sm text-[#C73E3E]">
-                  {submitError}
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={!canSubmit || submitting}
-                className="flex w-full items-center justify-center gap-2 rounded-full bg-[#B85C4F] px-6 py-3.5 text-sm font-medium text-white transition-colors hover:bg-[#9A4A3F] disabled:cursor-not-allowed disabled:bg-[#E8E6E1] disabled:text-[#9B9B9B]"
-              >
-                {submitting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Analyzing your style...
-                  </>
-                ) : (
-                  <>Generate My Style Report</>
-                )}
-              </button>
-            </form>
-          </section>
-        )}
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }
