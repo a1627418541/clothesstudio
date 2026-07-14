@@ -241,12 +241,30 @@ enum GenderScope {
   OTHER
 }
 
+enum RecommendationSource {
+  LEGACY_AI
+  ARCHETYPE_V2
+}
+
+enum MacroCategory {
+  DAILY_CLEAN
+  CLASSIC_PREMIUM
+  BUSINESS_FORMAL
+  URBAN_STREET
+  ARTISTIC_MINIMAL
+  OUTDOOR_FUNCTIONAL
+  ROMANTIC_SOFT
+  SPORT_ACTIVE
+  TREND_YOUTH
+}
+
 model StyleArchetype {
   id                  String   @id @default(cuid())
   slug                String   @unique
   name                String
   genderScope         GenderScope
   category            String
+  macroCategory       MacroCategory?
   description         String   @db.Text
   personalityLabel    String?
   keywords            String[]
@@ -255,6 +273,18 @@ model StyleArchetype {
   shoesDNA            String   @db.Text
   colorDNA            String[]
   avoidDNA            String   @db.Text
+  requiredItems       String[] @default([])
+  forbiddenItems      String[] @default([])
+  silhouetteDNA       String?  @db.Text
+  sceneMood           String?  @db.Text
+  vibeAliases         String[] @default([])
+  clothingMatchTerms  String[] @default([])
+  sceneMatchTerms     String[] @default([])
+  personalityTerms    String[] @default([])
+  preferredBodyTypes  String[] @default([])
+  preferredFaceShapes String[] @default([])
+  ageMin              Int?
+  ageMax              Int?
   imagePromptTemplate String   @db.Text
   version             Int      @default(1)
   active              Boolean  @default(true)
@@ -265,6 +295,8 @@ model StyleArchetype {
 
   @@index([genderScope, active])
   @@index([category])
+  @@index([active, genderScope, version])
+  @@index([macroCategory, active])
 }
 
 // AI-generated recommendations (placeholder for Sprint 2+)
@@ -284,16 +316,21 @@ model StyleRecommendation {
 
   rank            Int            @default(0)
   isPrimary       Boolean        @default(false)
+  sourceMode      RecommendationSource @default(LEGACY_AI)
 
   previewImageUrl     String?
   previewImageStatus  ImageStatus @default(PENDING)
   previewImagePrompt  String?     @db.Text
   previewImageError   String?
+  promptCompilerVersion Int?
+  previewAttemptCount   Int        @default(0)
 
   archetypeId String?
   archetype   StyleArchetype? @relation(fields: [archetypeId], references: [id], onDelete: SetNull)
 
-  matchScore  Int?
+  archetypeVersion  Int?
+  archetypeSnapshot Json?
+  matchScore        Int?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -1,4 +1,11 @@
-import { AiJobStatus, AiJobType, ImageStatus, Prisma } from "@prisma/client";
+import {
+  AiJobStatus,
+  AiJobType,
+  ImageStatus,
+  MacroCategory,
+  Prisma,
+  RecommendationSource,
+} from "@prisma/client";
 import { describe, expect, expectTypeOf, it } from "vitest";
 
 function getModel(name: string) {
@@ -62,5 +69,64 @@ describe("Sprint 3.8 current Prisma contracts", () => {
     };
     expect(withoutJson.input).toBeUndefined();
     expect(withoutJson.output).toBeUndefined();
+  });
+
+  it("defines the approved Archetype V2 enums", () => {
+    expect(Object.values(RecommendationSource)).toEqual([
+      "LEGACY_AI",
+      "ARCHETYPE_V2",
+    ]);
+    expect(Object.values(MacroCategory)).toEqual([
+      "DAILY_CLEAN",
+      "CLASSIC_PREMIUM",
+      "BUSINESS_FORMAL",
+      "URBAN_STREET",
+      "ARTISTIC_MINIMAL",
+      "OUTDOOR_FUNCTIONAL",
+      "ROMANTIC_SOFT",
+      "SPORT_ACTIVE",
+      "TREND_YOUTH",
+    ]);
+  });
+
+  it("adds only the approved V2 recommendation fields", () => {
+    const fieldNames = getModel("StyleRecommendation").fields.map(
+      (field) => field.name
+    );
+
+    expect(fieldNames).toEqual(
+      expect.arrayContaining([
+        "sourceMode",
+        "archetypeVersion",
+        "archetypeSnapshot",
+        "promptCompilerVersion",
+        "previewAttemptCount",
+      ])
+    );
+    expect(fieldNames).not.toContain("recommendedColors");
+  });
+
+  it("adds the complete structured V2 archetype field set", () => {
+    const fieldNames = getModel("StyleArchetype").fields.map(
+      (field) => field.name
+    );
+
+    expect(fieldNames).toEqual(
+      expect.arrayContaining([
+        "macroCategory",
+        "requiredItems",
+        "forbiddenItems",
+        "silhouetteDNA",
+        "sceneMood",
+        "vibeAliases",
+        "clothingMatchTerms",
+        "sceneMatchTerms",
+        "personalityTerms",
+        "preferredBodyTypes",
+        "preferredFaceShapes",
+        "ageMin",
+        "ageMax",
+      ])
+    );
   });
 });
