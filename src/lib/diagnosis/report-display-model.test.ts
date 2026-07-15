@@ -122,6 +122,7 @@ describe("snapshot-authoritative report display model", () => {
       forbiddenItems: snapshot.styleDNA.forbiddenItems,
       sceneMood: snapshot.styleDNA.sceneMood,
       canGeneratePreview: true,
+      canRetryPreview: true,
       archetype: {
         id: snapshot.provenance.archetypeId,
         name: snapshot.identity.name,
@@ -152,6 +153,7 @@ describe("snapshot-authoritative report display model", () => {
         name: "Legacy Archetype",
       },
       canGeneratePreview: true,
+      canRetryPreview: true,
       previewImageStatus: "PENDING",
     });
   });
@@ -204,6 +206,7 @@ describe("snapshot-authoritative report display model", () => {
       previewImageUrl: "https://cdn.example/existing.webp",
       previewImageStatus: "COMPLETED",
       canGeneratePreview: false,
+      canRetryPreview: false,
       archetype: null,
     });
 
@@ -216,10 +219,16 @@ describe("snapshot-authoritative report display model", () => {
       previewImageUrl: null,
       previewImageStatus: "FAILED",
       canGeneratePreview: false,
+      canRetryPreview: false,
     });
     expect(
       withoutImage.model.recommendations.every(
         (recommendation) => !recommendation.canGeneratePreview
+      )
+    ).toBe(true);
+    expect(
+      withoutImage.model.recommendations.every(
+        (recommendation) => !recommendation.canRetryPreview
       )
     ).toBe(true);
   });

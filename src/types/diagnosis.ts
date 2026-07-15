@@ -33,6 +33,7 @@ interface BaseReportRecommendation {
   silhouette: string | null;
   sceneMood: string | null;
   canGeneratePreview: boolean;
+  canRetryPreview: boolean;
 }
 
 export interface V2ReportRecommendation extends BaseReportRecommendation {
@@ -46,6 +47,7 @@ export interface V2ReportRecommendation extends BaseReportRecommendation {
   silhouette: string;
   sceneMood: string;
   canGeneratePreview: true;
+  canRetryPreview: true;
 }
 
 export interface LegacyReportRecommendation extends BaseReportRecommendation {

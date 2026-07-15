@@ -3,8 +3,15 @@ import { auth } from "@/lib/auth";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { getAnonymousSessionByToken } from "@/lib/anonymous-session";
-import { generateStylePreviewImage } from "@/lib/ai/style-preview-service";
 import { getRequestedPreviewStatuses } from "@/lib/ai/style-preview-policy";
+import { runStylePreviewAttempt } from "@/lib/ai/style-preview-attempt-service";
+import {
+  buildCompiledStylePrompt,
+  compileStylePreviewPrompt,
+  STYLE_PREVIEW_COMPILER_VERSION,
+} from "@/lib/ai/style-preview-compiler";
+import { buildStylePreviewPrompt } from "@/lib/ai/style-preview-prompt";
+import { parseV2RecommendationSet } from "@/lib/style-archetype/recommendation-snapshot";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -34,20 +41,6 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       include: {
         recommendations: {
           orderBy: { rank: "asc" },
-          include: {
-            archetype: {
-              select: {
-                name: true,
-                personalityLabel: true,
-                imagePromptTemplate: true,
-                clothingDNA: true,
-                hairstyleDNA: true,
-                shoesDNA: true,
-                colorDNA: true,
-                avoidDNA: true,
-              },
-            },
-          },
         },
       },
     });
@@ -68,6 +61,24 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
 
     const retryFailed = request.nextUrl.searchParams.get("retryFailed") === "true";
     const requestedStatuses = getRequestedPreviewStatuses(retryFailed);
+    const containsV2 = diagnosis.recommendations.some(
+      (recommendation) => recommendation.sourceMode === "ARCHETYPE_V2"
+    );
+    const v2Snapshots = containsV2
+      ? parseV2RecommendationSet(diagnosis.recommendations)
+      : null;
+
+    if (containsV2 && !v2Snapshots) {
+      return NextResponse.json({
+        ok: true,
+        data: {
+          updated: 0,
+          skipped: diagnosis.recommendations.length,
+          failed: 0,
+        },
+      });
+    }
+
     const candidates = diagnosis.recommendations.filter((rec) =>
       requestedStatuses.includes(rec.previewImageStatus)
     );
@@ -75,79 +86,60 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     let updated = 0;
     let skipped = diagnosis.recommendations.length - candidates.length;
     let failed = 0;
-    const claimedRecommendations = [];
-
-    for (const rec of candidates) {
-      const claim = await prisma.styleRecommendation.updateMany({
-        where: {
-          id: rec.id,
-          previewImageStatus: rec.previewImageStatus,
-        },
-        data: { previewImageStatus: "PROCESSING", previewImageError: null },
-      });
-
-      if (claim.count === 0) {
-        skipped++;
-        continue;
-      }
-
-      claimedRecommendations.push(rec);
-    }
 
     const outcomes = await Promise.all(
-      claimedRecommendations.map(async (rec) => {
-        try {
-          const result = await generateStylePreviewImage({
-            diagnosis: {
-              id: diagnosis.id,
-              gender: diagnosis.gender,
-              age: diagnosis.age,
-              heightCm: diagnosis.heightCm,
-              weightKg: diagnosis.weightKg,
-              bodyType: diagnosis.bodyType,
-              faceShape: diagnosis.faceShape,
-            },
-            recommendation: rec,
+      candidates.map(async (rec) => {
+        let finalPrompt: string;
+        let compilerVersion: number | null;
+        if (rec.sourceMode === "ARCHETYPE_V2") {
+          const snapshot = v2Snapshots?.find(
+            (candidate) => candidate.selection.rank === rec.rank
+          );
+          if (!snapshot) return "skipped" as const;
+          finalPrompt = compileStylePreviewPrompt(
+            buildCompiledStylePrompt(snapshot)
+          );
+          compilerVersion = STYLE_PREVIEW_COMPILER_VERSION;
+        } else if (rec.sourceMode === "LEGACY_AI") {
+          finalPrompt = buildStylePreviewPrompt({
+            gender: diagnosis.gender,
+            age: diagnosis.age,
+            title: rec.title,
+            description: rec.description,
+            summary: rec.summary,
+            clothingAdvice: rec.clothingAdvice,
+            hairstyleAdvice: rec.hairstyleAdvice,
+            shoesAdvice: rec.shoesAdvice,
+            colorPalette: rec.colorPalette,
           });
-          if (result.status === "COMPLETED") {
-            await prisma.styleRecommendation.update({
-              where: { id: rec.id },
-              data: {
-                previewImageUrl: result.url,
-                previewImageStatus: "COMPLETED",
-                previewImagePrompt: result.prompt,
-                previewImageError: null,
-              },
-            });
-            return "updated" as const;
-          }
-          await prisma.styleRecommendation.update({
-            where: { id: rec.id },
-            data: {
-              previewImageStatus: "FAILED",
-              previewImagePrompt: result.prompt,
-              previewImageError: result.error,
-            },
-          });
-          return "failed" as const;
-        } catch (error) {
-          const message =
-            error instanceof Error ? error.message : "Unknown generation error";
-          await prisma.styleRecommendation.update({
-            where: { id: rec.id },
-            data: {
-              previewImageStatus: "FAILED",
-              previewImageError: message,
-            },
-          });
-          return "failed" as const;
+          compilerVersion = null;
+        } else {
+          return "skipped" as const;
         }
+
+        const result = await runStylePreviewAttempt({
+          client: prisma,
+          recommendation: rec,
+          owner: {
+            userId: diagnosis.userId,
+            anonymousSessionId: diagnosis.anonymousSessionId,
+          },
+          expectedStatus: retryFailed ? "FAILED" : "PENDING",
+          finalPrompt,
+          compilerVersion,
+        });
+
+        if (result.status === "COMPLETED") return "updated" as const;
+        if (result.status === "SKIPPED") return "skipped" as const;
+        return "failed" as const;
       })
     );
 
     for (const outcome of outcomes) {
       if (outcome === "updated") {
         updated++;
+      } else if (outcome === "skipped") {
+        skipped++;
       } else {
         failed++;
       }

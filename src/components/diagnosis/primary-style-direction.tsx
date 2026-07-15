@@ -31,7 +31,11 @@ export function PrimaryStyleDirection({
             <p className="mt-5 text-sm italic leading-6 text-[var(--oxblood)]">{recommendation.description}</p>
           ) : null}
           <div className="mt-7">
-            <RecommendationMeta archetype={recommendation.archetype} matchScore={recommendation.matchScore} />
+            <RecommendationMeta
+              archetype={recommendation.archetype}
+              matchScore={recommendation.matchScore}
+              macroCategory={recommendation.macroCategory}
+            />
           </div>
           <p className="mt-7 text-lg leading-8 text-[var(--muted-ink)]">{recommendation.summary}</p>
           <div className="mt-8 border-t border-[var(--line)] pt-6">

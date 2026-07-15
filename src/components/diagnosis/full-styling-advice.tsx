@@ -22,7 +22,14 @@ export function FullStylingAdvice({ recommendations }: { recommendations: Report
                 <p className="text-xs uppercase tracking-[0.16em] text-[var(--oxblood)]">{recommendation.isPrimary ? "Primary direction" : `Direction ${String(recommendation.rank).padStart(2, "0")}`}</p>
                 <h3 className="mt-2 font-editorial text-4xl font-medium">{recommendation.title}</h3>
               </div>
-              <div className="w-[430px]"><RecommendationMeta archetype={recommendation.archetype} matchScore={recommendation.matchScore} compact /></div>
+              <div className="w-[430px]">
+                <RecommendationMeta
+                  archetype={recommendation.archetype}
+                  matchScore={recommendation.matchScore}
+                  macroCategory={recommendation.macroCategory}
+                  compact
+                />
+              </div>
             </div>
             <div className="mt-7 grid grid-cols-3 divide-x divide-[var(--line)]">
               {adviceBlocks.map(([key, label, Icon], index) => (

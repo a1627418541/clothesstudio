@@ -5,9 +5,26 @@ export type PreviewImageStatus =
   | "FAILED";
 
 export function shouldAutoGenerateStylePreviews(
-  recommendations: { previewImageStatus: string }[]
+  recommendations: {
+    previewImageStatus: string;
+    canGeneratePreview: boolean;
+  }[]
 ): boolean {
-  return recommendations.some((rec) => rec.previewImageStatus === "PENDING");
+  return recommendations.some(
+    (rec) =>
+      rec.previewImageStatus === "PENDING" && rec.canGeneratePreview
+  );
+}
+
+export function shouldOfferStylePreviewRetry(
+  recommendations: {
+    previewImageStatus: string;
+    canRetryPreview: boolean;
+  }[]
+): boolean {
+  return recommendations.some(
+    (rec) => rec.previewImageStatus === "FAILED" && rec.canRetryPreview
+  );
 }
 
 export function getRequestedPreviewStatuses(

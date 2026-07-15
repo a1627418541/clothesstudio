@@ -19,6 +19,11 @@ export interface PersistRecommendationPlanInput {
   plan: RecommendationPlan;
 }
 
+export interface PersistedRecommendationPlanDiagnosis {
+  id: string;
+  status: string;
+}
+
 function projectClothingAdvice(draft: V2RecommendationDraft): string {
   const { styleDNA } = draft.snapshot;
   return [
@@ -96,7 +101,7 @@ function recommendationCreateData(
 
 export async function persistRecommendationPlan(
   input: PersistRecommendationPlanInput
-): Promise<unknown> {
+): Promise<PersistedRecommendationPlanDiagnosis> {
   return input.client.$transaction(async (tx) => {
     const diagnosis = await tx.styleDiagnosis.update({
       where: { id: input.diagnosisId },

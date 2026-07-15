@@ -140,6 +140,7 @@ function buildV2Model(
       silhouette: snapshot.styleDNA.silhouetteDNA,
       sceneMood: snapshot.styleDNA.sceneMood,
       canGeneratePreview: true,
+      canRetryPreview: true,
     };
   });
   return {
@@ -191,6 +192,7 @@ function buildLegacyModel(
       silhouette: null,
       sceneMood: null,
       canGeneratePreview: isTrueLegacy,
+      canRetryPreview: isTrueLegacy,
     })
   );
   return {
