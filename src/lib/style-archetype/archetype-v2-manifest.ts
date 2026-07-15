@@ -279,8 +279,12 @@ export interface V2ManifestValidationResult {
   errors: V2ManifestValidationError[];
 }
 
+type CandidateValue<Value> = Value extends Array<infer Item>
+  ? readonly Item[]
+  : Value;
+
 type NullablePartial<T> = {
-  [Key in keyof T]?: T[Key] | null;
+  [Key in keyof T]?: CandidateValue<T[Key]> | null;
 };
 
 export type V2ArchetypeCandidate = NullablePartial<
