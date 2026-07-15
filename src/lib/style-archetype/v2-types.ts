@@ -100,3 +100,70 @@ export type V2CreationFallbackReason =
   | "INSUFFICIENT_ELIGIBLE_ARCHETYPES"
   | "SNAPSHOT_VALIDATION_FAILED"
   | "INVALID_V2_RECOMMENDATION_SET";
+
+export type SnapshotRank = 1 | 2 | 3;
+export type SubjectGenderPresentation =
+  | "MASCULINE"
+  | "FEMININE"
+  | "ANDROGYNOUS";
+
+export interface ArchetypeRecommendationSnapshot {
+  readonly schemaVersion: typeof SNAPSHOT_SCHEMA_VERSION;
+  readonly archetypeVersion: number;
+  readonly provenance: {
+    readonly archetypeId: string;
+    readonly archetypeSlug: string;
+  };
+  readonly selection: {
+    readonly rank: SnapshotRank;
+    readonly matchScore: number;
+    readonly macroCategory: MacroCategory;
+  };
+  readonly identity: {
+    readonly name: string;
+    readonly category: string;
+    readonly personalityLabel: string;
+    readonly description: string;
+  };
+  readonly styleDNA: {
+    readonly clothingDNA: string;
+    readonly hairstyleDNA: string;
+    readonly shoesDNA: string;
+    readonly colorDNA: readonly string[];
+    readonly avoidDNA: string;
+    readonly requiredItems: readonly string[];
+    readonly forbiddenItems: readonly string[];
+    readonly silhouetteDNA: string;
+    readonly sceneMood: string;
+  };
+  readonly subjectContext: {
+    readonly genderPresentation: SubjectGenderPresentation;
+    readonly bodyTypeHint: string | null;
+    readonly faceShapeHint: string | null;
+    readonly ageBand: string | null;
+  };
+}
+
+export type V2SnapshotValidationReason =
+  | "INVALID_SOURCE_MODE"
+  | "UNSUPPORTED_SCHEMA_VERSION"
+  | "INVALID_ARCHETYPE_VERSION"
+  | "VERSION_MISMATCH"
+  | "MISSING_REQUIRED_FIELD"
+  | "INVALID_MACRO_CATEGORY"
+  | "INVALID_MATCH_SCORE"
+  | "INVALID_RANK"
+  | "INVALID_COLOR_DNA"
+  | "INVALID_REQUIRED_ITEMS"
+  | "INVALID_FORBIDDEN_ITEMS"
+  | "REQUIRED_FORBIDDEN_CONFLICT"
+  | "ARCHETYPE_ID_MISMATCH"
+  | "SIZE_LIMIT_EXCEEDED"
+  | "UNSAFE_SNAPSHOT_TEXT";
+
+export type V2SnapshotSetValidationReason =
+  | "SET_SIZE_INVALID"
+  | "INVALID_MEMBER"
+  | "DUPLICATE_RANK"
+  | "DUPLICATE_ARCHETYPE_ID"
+  | "RANK_SET_INVALID";
