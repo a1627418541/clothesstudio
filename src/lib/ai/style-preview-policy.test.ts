@@ -23,6 +23,6 @@ describe("style preview generation policy", () => {
 
   it("includes failed recommendations only for explicit retry", () => {
     expect(getRequestedPreviewStatuses(false)).toEqual(["PENDING"]);
-    expect(getRequestedPreviewStatuses(true)).toEqual(["PENDING", "FAILED"]);
+    expect(getRequestedPreviewStatuses(true)).toEqual(["FAILED"]);
   });
 });

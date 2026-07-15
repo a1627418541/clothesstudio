@@ -13,5 +13,5 @@ export function shouldAutoGenerateStylePreviews(
 export function getRequestedPreviewStatuses(
   retryFailed: boolean
 ): PreviewImageStatus[] {
-  return retryFailed ? ["PENDING", "FAILED"] : ["PENDING"];
+  return retryFailed ? ["FAILED"] : ["PENDING"];
 }
