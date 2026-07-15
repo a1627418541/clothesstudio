@@ -235,13 +235,19 @@ export function rankEligibleArchetypes(
 ): ScoredEligibleArchetype[] {
   return archetypes
     .map((archetype) => scoreEligibleArchetype(input, archetype))
-    .sort(
-      (left, right) =>
-        right.breakdown.total - left.breakdown.total ||
-        right.completePhraseCount - left.completePhraseCount ||
-        right.aliasMatchCount - left.aliasMatchCount ||
-        MACRO_CATEGORY_ORDER.indexOf(left.archetype.macroCategory) -
-          MACRO_CATEGORY_ORDER.indexOf(right.archetype.macroCategory) ||
-        left.archetype.slug.localeCompare(right.archetype.slug)
-    );
+    .sort(compareScoredEligibleArchetypes);
+}
+
+export function compareScoredEligibleArchetypes(
+  left: ScoredEligibleArchetype,
+  right: ScoredEligibleArchetype
+): number {
+  return (
+    right.breakdown.total - left.breakdown.total ||
+    right.completePhraseCount - left.completePhraseCount ||
+    right.aliasMatchCount - left.aliasMatchCount ||
+    MACRO_CATEGORY_ORDER.indexOf(left.archetype.macroCategory) -
+      MACRO_CATEGORY_ORDER.indexOf(right.archetype.macroCategory) ||
+    left.archetype.slug.localeCompare(right.archetype.slug)
+  );
 }

@@ -89,3 +89,14 @@ export interface ArchetypeScoreBreakdown {
   matchedPhrases: string[];
   matchedAliases: string[];
 }
+
+export type V2DiversityWarning =
+  | "ONLY_TWO_MACRO_CATEGORIES"
+  | "ONLY_ONE_MACRO_CATEGORY";
+
+export type V2CreationFallbackReason =
+  | "V2_DISABLED"
+  | "V2_READINESS_FAILED"
+  | "INSUFFICIENT_ELIGIBLE_ARCHETYPES"
+  | "SNAPSHOT_VALIDATION_FAILED"
+  | "INVALID_V2_RECOMMENDATION_SET";
