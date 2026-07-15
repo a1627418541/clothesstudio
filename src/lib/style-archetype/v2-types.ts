@@ -53,3 +53,39 @@ export const V2_INELIGIBILITY_REASON_ORDER = [
 
 export type V2IneligibilityReason =
   (typeof V2_INELIGIBILITY_REASON_ORDER)[number];
+
+export const MACRO_CATEGORY_ORDER: readonly MacroCategory[] = [
+  MacroCategory.DAILY_CLEAN,
+  MacroCategory.CLASSIC_PREMIUM,
+  MacroCategory.BUSINESS_FORMAL,
+  MacroCategory.URBAN_STREET,
+  MacroCategory.ARTISTIC_MINIMAL,
+  MacroCategory.OUTDOOR_FUNCTIONAL,
+  MacroCategory.ROMANTIC_SOFT,
+  MacroCategory.SPORT_ACTIVE,
+  MacroCategory.TREND_YOUTH,
+];
+
+export interface V2DiagnosisAnalysisInput {
+  gender: "MALE" | "FEMALE" | "OTHER";
+  age: number;
+  heightCm: number;
+  weightKg: number;
+  bodyType: string | null;
+  faceShape: string | null;
+  vibeKeywords: string[];
+  diagnosisSummary: string;
+}
+
+export interface ArchetypeScoreBreakdown {
+  vibe: number;
+  body: number;
+  face: number;
+  age: number;
+  clothing: number;
+  scene: number;
+  personality: number;
+  total: number;
+  matchedPhrases: string[];
+  matchedAliases: string[];
+}
