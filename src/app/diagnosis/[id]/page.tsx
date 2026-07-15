@@ -12,7 +12,10 @@ import { StyleIdentity } from "@/components/diagnosis/style-identity";
 import { UploadedPhotos } from "@/components/diagnosis/uploaded-photos";
 import { EditorialLabel } from "@/components/ui/editorial-label";
 import { SiteHeader } from "@/components/ui/site-header";
-import { shouldAutoGenerateStylePreviews } from "@/lib/ai/style-preview-policy";
+import {
+  shouldAutoGenerateStylePreviews,
+  shouldOfferStylePreviewRetry,
+} from "@/lib/ai/style-preview-policy";
 import { ReportRecommendation } from "@/types/diagnosis";
 
 interface DiagnosisDetail {
@@ -128,8 +131,8 @@ export default function DiagnosisDetailPage() {
   const alternatives = diagnosis.recommendations.filter(
     (recommendation) => !recommendation.isPrimary
   );
-  const hasFailedPreviews = diagnosis.recommendations.some(
-    (recommendation) => recommendation.previewImageStatus === "FAILED"
+  const hasRetryableFailedPreviews = shouldOfferStylePreviewRetry(
+    diagnosis.recommendations
   );
   const createdAt = new Date(diagnosis.createdAt).toLocaleDateString("en-US", {
     year: "numeric",
@@ -187,7 +190,7 @@ export default function DiagnosisDetailPage() {
         <FullStylingAdvice recommendations={diagnosis.recommendations} />
         <UploadedPhotos photos={diagnosis.photos} />
 
-        {hasFailedPreviews ? (
+        {hasRetryableFailedPreviews ? (
           <section className="mb-14 border border-[var(--line)] bg-[var(--surface)] p-8 text-center">
             <EditorialLabel>Preview status</EditorialLabel>
             <p className="mx-auto mt-5 max-w-xl text-sm leading-6 text-[var(--muted-ink)]">

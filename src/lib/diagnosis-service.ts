@@ -1,5 +1,9 @@
 import { prisma } from "@/lib/prisma";
-import { ReportRecommendation } from "@/types/diagnosis";
+import {
+  buildReportDisplayModel,
+  ReportRecommendationRecord,
+} from "@/lib/diagnosis/report-display-model";
+import { ReportDisplayModel, ReportRecommendation } from "@/types/diagnosis";
 import { DiagnosisPhotoRole } from "@prisma/client";
 
 export interface DiagnosisDetail {
@@ -19,6 +23,7 @@ export interface DiagnosisDetail {
     url: string | null;
     mimeType: string;
   }[];
+  reportMode: ReportDisplayModel["mode"];
   recommendations: ReportRecommendation[];
 }
 
@@ -46,16 +51,6 @@ export async function getDiagnosisDetailForViewer({
       },
       recommendations: {
         orderBy: { rank: "asc" },
-        include: {
-          archetype: {
-            select: {
-              id: true,
-              name: true,
-              personalityLabel: true,
-              category: true,
-            },
-          },
-        },
       },
     },
   });
@@ -84,6 +79,61 @@ export async function getDiagnosisDetailForViewer({
     };
   });
 
+  const baseRecommendationRecords: ReportRecommendationRecord[] =
+    diagnosis.recommendations.map((rec) => ({
+      id: rec.id,
+      rank: rec.rank,
+      isPrimary: rec.isPrimary,
+      sourceMode: rec.sourceMode,
+      archetypeVersion: rec.archetypeVersion,
+      archetypeSnapshot: rec.archetypeSnapshot,
+      archetypeId: rec.archetypeId,
+      matchScore: rec.matchScore,
+      title: rec.title,
+      description: rec.description,
+      summary: rec.summary,
+      clothingAdvice: rec.clothingAdvice,
+      hairstyleAdvice: rec.hairstyleAdvice,
+      shoesAdvice: rec.shoesAdvice,
+      colorPalette: rec.colorPalette,
+      avoidTips: rec.avoidTips,
+      previewImageUrl: rec.previewImageUrl,
+      previewImageStatus: rec.previewImageStatus,
+      previewImageError: rec.previewImageError,
+      archetype: null,
+    }));
+
+  let reportProjection = buildReportDisplayModel(baseRecommendationRecords);
+  if (reportProjection.fallbackReason === "TRUE_LEGACY_RECORD") {
+    const legacyRelations = await prisma.styleRecommendation.findMany({
+      where: { diagnosisId: diagnosis.id },
+      orderBy: { rank: "asc" },
+      include: {
+        archetype: {
+          select: {
+            id: true,
+            name: true,
+            personalityLabel: true,
+            category: true,
+          },
+        },
+      },
+    });
+    const relationByRecommendationId = new Map(
+      legacyRelations.map((recommendation) => [
+        recommendation.id,
+        recommendation.archetype,
+      ])
+    );
+    reportProjection = buildReportDisplayModel(
+      baseRecommendationRecords.map((recommendation) => ({
+        ...recommendation,
+        archetype:
+          relationByRecommendationId.get(recommendation.id) ?? null,
+      }))
+    );
+  }
+
   const detail: DiagnosisDetail = {
     id: diagnosis.id,
     gender: diagnosis.gender,
@@ -97,31 +147,8 @@ export async function getDiagnosisDetailForViewer({
     summary: diagnosis.summary,
     createdAt: diagnosis.createdAt,
     photos: orderedPhotos,
-    recommendations: diagnosis.recommendations.map((rec) => ({
-      id: rec.id,
-      rank: rec.rank,
-      isPrimary: rec.isPrimary,
-      title: rec.title,
-      description: rec.description,
-      summary: rec.summary,
-      clothingAdvice: rec.clothingAdvice,
-      hairstyleAdvice: rec.hairstyleAdvice,
-      shoesAdvice: rec.shoesAdvice,
-      colorPalette: rec.colorPalette,
-      avoidTips: rec.avoidTips,
-      previewImageUrl: rec.previewImageUrl,
-      previewImageStatus: rec.previewImageStatus,
-      previewImageError: rec.previewImageError,
-      archetype: rec.archetype
-        ? {
-            id: rec.archetype.id,
-            name: rec.archetype.name,
-            personalityLabel: rec.archetype.personalityLabel,
-            category: rec.archetype.category,
-          }
-        : null,
-      matchScore: rec.matchScore,
-    })),
+    reportMode: reportProjection.model.mode,
+    recommendations: reportProjection.model.recommendations,
   };
 
   return { ok: true, diagnosis: detail };

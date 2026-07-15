@@ -3,12 +3,14 @@ import { ReportRecommendation } from "@/types/diagnosis";
 interface RecommendationMetaProps {
   archetype: ReportRecommendation["archetype"];
   matchScore: number | null;
+  macroCategory?: ReportRecommendation["macroCategory"];
   compact?: boolean;
 }
 
 export function RecommendationMeta({
   archetype,
   matchScore,
+  macroCategory = null,
   compact = false,
 }: RecommendationMetaProps) {
   if (!archetype) return null;
@@ -19,6 +21,9 @@ export function RecommendationMeta({
       ? [["Personality", archetype.personalityLabel] as [string, string]]
       : []),
     ["Category", archetype.category],
+    ...(macroCategory
+      ? [["Macro category", macroCategory.replaceAll("_", " ")] as [string, string]]
+      : []),
     ...(matchScore === null
       ? []
       : [["Rules match", `${matchScore}%`] as [string, string]]),

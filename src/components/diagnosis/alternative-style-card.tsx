@@ -27,7 +27,14 @@ export function AlternativeStyleCard({
         <EditorialLabel>Direction {directionNumber}</EditorialLabel>
         <h3 className="mt-5 font-editorial text-4xl font-medium leading-none text-[var(--ink)]">{recommendation.title}</h3>
         {recommendation.description ? <p className="mt-3 text-sm italic text-[var(--oxblood)]">{recommendation.description}</p> : null}
-        <div className="mt-5"><RecommendationMeta archetype={recommendation.archetype} matchScore={recommendation.matchScore} compact /></div>
+        <div className="mt-5">
+          <RecommendationMeta
+            archetype={recommendation.archetype}
+            matchScore={recommendation.matchScore}
+            macroCategory={recommendation.macroCategory}
+            compact
+          />
+        </div>
         <p className="mt-5 text-sm leading-7 text-[var(--muted-ink)]">{recommendation.summary}</p>
         <div className="mt-6 border-t border-[var(--line)] pt-5"><ColorPalette colors={recommendation.colorPalette} /></div>
         {recommendation.avoidTips.length > 0 ? (

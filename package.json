@@ -9,6 +9,7 @@
     "test": "vitest run",
     "lint": "eslint",
     "seed": "tsx prisma/seed-style-archetypes.ts",
+    "readiness:archetype-v2": "tsx scripts/check-style-archetype-v2-readiness.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {
@@ -41,6 +42,7 @@
     "eslint": "^9",
     "eslint-config-next": "^15.5.20",
     "tailwindcss": "^4",
+    "tsx": "^4.23.1",
     "typescript": "^5",
     "vitest": "^4.1.10"
   }

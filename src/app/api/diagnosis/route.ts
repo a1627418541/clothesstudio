@@ -5,8 +5,11 @@ import { getAnonymousSessionByToken } from "@/lib/anonymous-session";
 import { diagnosisFormSchema } from "@/lib/validators/diagnosis";
 import { StyleAiService } from "@/lib/ai/style-ai-service";
 import { StyleAiInput } from "@/lib/ai/style-ai-provider";
-import { MATCH_WEIGHTS } from "@/lib/style-archetype/match-config";
-import { buildMatchedRecommendations, MatchedRecommendation } from "@/lib/style-archetype/diagnosis-matcher";
+import {
+  buildDiagnosisAnalysisInput,
+  buildRecommendationPlan,
+} from "@/lib/style-archetype/recommendation-plan";
+import { persistRecommendationPlan } from "@/lib/style-archetype/recommendation-persistence";
 
 export async function POST(request: NextRequest) {
   try {
@@ -120,56 +123,40 @@ export async function POST(request: NextRequest) {
       orderBy: { createdAt: "asc" },
     });
 
-    const matchedRecommendations: MatchedRecommendation[] = buildMatchedRecommendations(
-      { gender, age, heightCm, weightKg },
-      output,
+    const recommendationPlan = buildRecommendationPlan({
+      featureFlagValue: process.env.STYLE_ARCHETYPE_V2_ENABLED,
+      diagnosisAnalysis: buildDiagnosisAnalysisInput(output, {
+        gender,
+        age,
+        heightCm,
+        weightKg,
+      }),
       archetypes,
-      {
-        topK: 3,
-        weights: MATCH_WEIGHTS,
-      }
-    );
+      legacyRecommendations: output.recommendations,
+    });
 
     let updatedDiagnosis;
     try {
-      updatedDiagnosis = await prisma.$transaction(async (tx) => {
-        await tx.styleDiagnosis.update({
-          where: { id: diagnosis.id },
-          data: {
-            bodyType: output.bodyType,
-            faceShape: output.faceShape,
-            vibeKeywords: output.vibeKeywords,
-            summary: output.summary,
-            status: "PREVIEW_READY",
-          },
-        });
-
-        await tx.styleRecommendation.createMany({
-          data: matchedRecommendations.map((item, index) => ({
-            diagnosisId: diagnosis.id,
-            title: item.recommendation.title,
-            description: item.recommendation.description,
-            summary: item.recommendation.summary,
-            clothingAdvice: item.recommendation.clothingAdvice,
-            hairstyleAdvice: item.recommendation.hairstyleAdvice,
-            shoesAdvice: item.recommendation.shoesAdvice,
-            colorPalette: item.recommendation.colorPalette,
-            avoidTips: item.recommendation.avoidTips,
-            rank: index + 1,
-            isPrimary: index === 0,
-            archetypeId: item.archetypeId ?? null,
-            matchScore: item.matchScore ?? null,
-          })),
-        });
-
-        return tx.styleDiagnosis.findUniqueOrThrow({
-          where: { id: diagnosis.id },
-        });
+      updatedDiagnosis = await persistRecommendationPlan({
+        client: prisma,
+        diagnosisId: diagnosis.id,
+        analysisOutput: output,
+        plan: recommendationPlan,
       });
     } catch (error) {
       const persistenceErrorMessage = error instanceof Error ? error.message : "Diagnosis persistence failed";
       try {
-        await styleAiService.finalizeJob(jobId, "PERSISTENCE_FAILED", output, persistenceErrorMessage);
+        await styleAiService.finalizeJob(
+          jobId,
+          "PERSISTENCE_FAILED",
+          output,
+          persistenceErrorMessage,
+          recommendationPlan.diagnostics,
+          {
+            errorCode: "RECOMMENDATION_PERSISTENCE_FAILED",
+            correlationId: jobId,
+          }
+        );
       } catch (finalizeError) {
         console.error("Failed to finalize AI job after persistence failure:", finalizeError);
       }
@@ -177,7 +164,13 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      await styleAiService.finalizeJob(jobId, errorMessage ? "FAILED" : "COMPLETED", output, errorMessage);
+      await styleAiService.finalizeJob(
+        jobId,
+        errorMessage ? "FAILED" : "COMPLETED",
+        output,
+        errorMessage,
+        recommendationPlan.diagnostics
+      );
     } catch (finalizeError) {
       console.error("Failed to finalize AI job after successful persistence:", finalizeError);
     }

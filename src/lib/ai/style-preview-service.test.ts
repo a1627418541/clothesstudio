@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { generateStylePreviewImage } from "./style-preview-service";
+import {
+  generateStylePreviewImage,
+  generateStylePreviewImageFromPrompt,
+} from "./style-preview-service";
 
 const baseInput = {
   diagnosis: {
@@ -37,6 +40,41 @@ const archetype = {
 };
 
 describe("generateStylePreviewImage persistence", () => {
+  it("sends an injected final prompt unchanged and reports the active provider", async () => {
+    const providerGenerate = vi.fn().mockResolvedValue({
+      url: "https://provider.example.com/final.png",
+    });
+    const finalPrompt = "FINAL COMPILED PROMPT\n[GLOBAL GUARDRAILS]\nNo logo.";
+
+    const result = await generateStylePreviewImageFromPrompt(
+      {
+        diagnosisId: "diagnosis-1",
+        recommendationId: "recommendation-1",
+        prompt: finalPrompt,
+      },
+      {
+        getProvider: () => ({
+          name: "mock",
+          provider: { generate: providerGenerate },
+        }),
+        mockProvider: { generate: vi.fn() },
+        storeImage: vi.fn().mockResolvedValue({
+          url: "https://r2.example.com/final.png",
+        }),
+        shouldFallbackToMock: () => false,
+      }
+    );
+
+    expect(providerGenerate).toHaveBeenCalledOnce();
+    expect(providerGenerate).toHaveBeenCalledWith({ prompt: finalPrompt });
+    expect(result).toMatchObject({
+      status: "COMPLETED",
+      prompt: finalPrompt,
+      providerName: "mock",
+      url: "https://r2.example.com/final.png",
+    });
+  });
+
   it("persists a mock fallback instead of returning its external URL", async () => {
     const storeImage = vi.fn().mockResolvedValue({
       url: "https://r2.example.com/persisted.png",
@@ -95,6 +133,7 @@ describe("generateStylePreviewImage persistence", () => {
       expect.objectContaining({
         status: "FAILED",
         error: "R2 unavailable",
+        failureKind: "PERSISTENCE",
       })
     );
     expect(result.url).toBeUndefined();
