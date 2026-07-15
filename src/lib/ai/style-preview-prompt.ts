@@ -50,7 +50,9 @@ Do not include the face of any real person.
   `.trim();
 }
 
-export function buildArchetypeStylePreviewPrompt(input: ArchetypePreviewPromptInput): string {
+export function buildLegacyArchetypeStylePreviewPrompt(
+  input: ArchetypePreviewPromptInput
+): string {
   const gender = input.gender.toLowerCase();
   const bodyTypeHint = input.bodyType ? `${input.bodyType} build` : "balanced proportions";
   const faceShapeHint = input.faceShape ? `${input.faceShape} face shape` : "neutral face shape";
@@ -83,4 +85,14 @@ Additional constraints for this style preview:
 - Do not generate a transformation image of the user.
 - No text, logos, or watermarks inside the image.
 - Clean studio or neutral background, soft natural light, editorial fashion photography.`;
+}
+
+/**
+ * @deprecated Database-template rendering is legacy-only. V2 callers must use
+ * buildCompiledStylePrompt() and compileStylePreviewPrompt().
+ */
+export function buildArchetypeStylePreviewPrompt(
+  input: ArchetypePreviewPromptInput
+): string {
+  return buildLegacyArchetypeStylePreviewPrompt(input);
 }

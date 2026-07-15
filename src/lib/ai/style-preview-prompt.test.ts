@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   buildArchetypeStylePreviewPrompt,
+  buildLegacyArchetypeStylePreviewPrompt,
   buildStylePreviewPrompt,
 } from "./style-preview-prompt";
 
@@ -31,6 +32,24 @@ const streetwearArchetype = {
 };
 
 describe("buildArchetypeStylePreviewPrompt", () => {
+  it("keeps database-template rendering behind an explicit legacy-only entry point", () => {
+    const prompt = buildLegacyArchetypeStylePreviewPrompt({
+      gender: "MALE",
+      age: 35,
+      bodyType: "rectangle",
+      faceShape: "oval",
+      archetype: {
+        ...oldMoneyArchetype,
+        imagePromptTemplate: "LEGACY DATABASE TEMPLATE: {clothingDNA}",
+      },
+    });
+
+    expect(prompt).toContain("LEGACY DATABASE TEMPLATE");
+    expect(buildArchetypeStylePreviewPrompt).not.toBe(
+      buildLegacyArchetypeStylePreviewPrompt
+    );
+  });
+
   it("renders archetype DNA fields into the prompt", () => {
     const prompt = buildArchetypeStylePreviewPrompt({
       gender: "MALE",
