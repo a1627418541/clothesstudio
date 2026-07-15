@@ -167,3 +167,28 @@ export type V2SnapshotSetValidationReason =
   | "DUPLICATE_RANK"
   | "DUPLICATE_ARCHETYPE_ID"
   | "RANK_SET_INVALID";
+
+export interface V2SelectionDiagnostics {
+  pipelineVersion: typeof ARCHETYPE_V2_VERSION;
+  selectedMode: RecommendationSource;
+  eligibleCount: number;
+  ineligibleReasonsByArchetype: Array<{
+    archetypeId: string;
+    reasonCodes: V2IneligibilityReason[];
+  }>;
+  selected: Array<{
+    rank: SnapshotRank;
+    archetypeId: string;
+    macroCategory: MacroCategory;
+    matchScore: number;
+  }>;
+  availableMacroCategoryCount: number;
+  diversityWarning: V2DiversityWarning | null;
+  fallbackReason: V2CreationFallbackReason | null;
+  infrastructureFailure?: {
+    errorCode:
+      | "RECOMMENDATION_PERSISTENCE_FAILED"
+      | "RESULT_PERSISTENCE_FAILED";
+    correlationId: string;
+  };
+}

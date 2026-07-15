@@ -15,6 +15,11 @@ import {
   STYLE_DIAGNOSIS_MODEL,
   STYLE_DIAGNOSIS_SYSTEM_PROMPT,
 } from "@/lib/ai/style-ai-prompt";
+import { V2SelectionDiagnostics } from "@/lib/style-archetype/v2-types";
+
+export type RecommendationPersistenceFailureAudit = NonNullable<
+  V2SelectionDiagnostics["infrastructureFailure"]
+>;
 
 export class StyleAiService {
   private providerName: string;
@@ -99,13 +104,24 @@ export class StyleAiService {
     jobId: string,
     status: "COMPLETED" | "FAILED" | "PERSISTENCE_FAILED",
     output: StyleAiOutput,
-    errorMessage: string | null
+    errorMessage: string | null,
+    recommendationPipeline?: V2SelectionDiagnostics,
+    infrastructureFailure?: RecommendationPersistenceFailureAudit
   ): Promise<void> {
+    const persistedOutput = recommendationPipeline
+      ? {
+          ...output,
+          recommendationPipeline: {
+            ...recommendationPipeline,
+            ...(infrastructureFailure ? { infrastructureFailure } : {}),
+          },
+        }
+      : output;
     await prisma.aiJob.update({
       where: { id: jobId },
       data: {
         status,
-        output: output as unknown as Prisma.InputJsonValue,
+        output: persistedOutput as unknown as Prisma.InputJsonValue,
         errorMessage,
         completedAt: new Date(),
       },
