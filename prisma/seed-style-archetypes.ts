@@ -16,7 +16,10 @@ interface SeedTransaction {
 }
 
 export interface SeedDatabase {
-  $transaction<T>(callback: (tx: SeedTransaction) => Promise<T>): Promise<T>;
+  $transaction<T>(
+    callback: (tx: SeedTransaction) => Promise<T>,
+    options?: { maxWait?: number; timeout?: number }
+  ): Promise<T>;
   $disconnect(): Promise<void>;
   styleArchetype: {
     findMany(args?: unknown): Promise<V2ArchetypeCandidate[]>;
@@ -72,16 +75,19 @@ export async function seedStyleArchetypes({
   }
   const rows = manifest as readonly V2ArchetypeManifestEntry[];
 
-  await db.$transaction(async (tx) => {
-    for (const row of rows) {
-      const data = toPersistenceData(row);
-      await tx.styleArchetype.upsert({
-        where: { slug: row.slug },
-        update: data,
-        create: { slug: row.slug, ...data },
-      });
-    }
-  });
+  await db.$transaction(
+    async (tx) => {
+      for (const row of rows) {
+        const data = toPersistenceData(row);
+        await tx.styleArchetype.upsert({
+          where: { slug: row.slug },
+          update: data,
+          create: { slug: row.slug, ...data },
+        });
+      }
+    },
+    { maxWait: 10_000, timeout: 60_000 }
+  );
 
   const persistedRows = await db.styleArchetype.findMany({
     where: { slug: { in: rows.map((row) => row.slug) } },
