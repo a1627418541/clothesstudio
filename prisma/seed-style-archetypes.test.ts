@@ -61,6 +61,10 @@ describe("V2 archetype seed", () => {
     const report = await seedStyleArchetypes({ db: fixture.db });
 
     expect(fixture.transaction).toHaveBeenCalledTimes(1);
+    expect(fixture.transaction).toHaveBeenCalledWith(expect.any(Function), {
+      maxWait: 10_000,
+      timeout: 60_000,
+    });
     expect(fixture.upsert).toHaveBeenCalledTimes(20);
     expect(fixture.findMany).toHaveBeenCalledTimes(1);
     expect(report.ready).toBe(true);
