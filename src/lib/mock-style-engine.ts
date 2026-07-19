@@ -1,3 +1,5 @@
+import { RecommendationItem } from "@/lib/ai/style-ai-provider";
+
 export interface MockStyleInput {
   gender: "MALE" | "FEMALE" | "OTHER";
   age: number;
@@ -14,6 +16,7 @@ export interface MockStyleRecommendation {
   shoesAdvice: string;
   colorPalette: string[];
   avoidTips: string[];
+  items: RecommendationItem[];
 }
 
 export interface MockStyleRecommendationsOutput {
@@ -47,7 +50,15 @@ function joinBilingual(base: BilingualText, notes: BilingualText[]): string {
   return `${enParts.join(" ")} / ${cnParts.join("")}`;
 }
 
-function baseStyle(gender: MockStyleInput["gender"]) {
+function baseStyle(gender: MockStyleInput["gender"]): {
+  title: string;
+  description: string;
+  summary: string;
+  clothingAdvice: BilingualText;
+  hairstyleAdvice: string;
+  shoesAdvice: string;
+  items: RecommendationItem[];
+} {
   switch (gender) {
     case "MALE":
       return {
@@ -63,6 +74,48 @@ function baseStyle(gender: MockStyleInput["gender"]) {
           "Keep hair neatly trimmed with natural texture; a side part or textured crop works well. / 保持头发自然纹理并整洁修剪，侧分或纹理短发都很合适。",
         shoesAdvice:
           "Clean white leather sneakers or minimalist loafers ground the outfit without looking too formal. / 干净的白色皮质运动鞋或极简乐福鞋，既不过于正式也很稳重。",
+        items: [
+          {
+            name: "structured wool blazer",
+            category: "outerwear",
+            why: "Adds clean shoulder structure that sharpens a rectangular frame.",
+            colors: ["navy", "charcoal"],
+            fitNotes: "Slim but not tight; shoulder seam should end at the natural shoulder edge.",
+            optional: false,
+          },
+          {
+            name: "crew-neck pima cotton t-shirt",
+            category: "top",
+            why: "A crisp base layer that keeps the look breathable and modern.",
+            colors: ["white", "light gray"],
+            fitNotes: "Fitted through the chest with sleeves ending mid-bicep.",
+            optional: false,
+          },
+          {
+            name: "tapered chino trousers",
+            category: "bottom",
+            why: "Tapers cleanly from knee to ankle to elongate the leg line.",
+            colors: ["khaki", "olive"],
+            fitNotes: "Mid-rise with a slight break at the shoe.",
+            optional: false,
+          },
+          {
+            name: "minimalist leather loafers",
+            category: "shoes",
+            why: "Polishes the outfit without the formality of a dress shoe.",
+            colors: ["dark brown", "black"],
+            fitNotes: "Snug across the instep, structured sole.",
+            optional: false,
+          },
+          {
+            name: "slim leather belt",
+            category: "accessory",
+            why: "Defines the waist and ties the neutral palette together.",
+            colors: ["cognac", "black"],
+            fitNotes: "Match to shoe color; width around 3 cm.",
+            optional: true,
+          },
+        ],
       };
     case "FEMALE":
       return {
@@ -78,6 +131,48 @@ function baseStyle(gender: MockStyleInput["gender"]) {
           "A low bun, soft waves, or a sleek ponytail keeps the focus on clean lines. / 低发髻、柔和波浪或利落马尾，让整体造型线条更干净。",
         shoesAdvice:
           "Neutral flats, minimalist ankle boots, or low-block heels keep the look effortless. / 中性色平底鞋、极简踝靴或低跟粗跟鞋，让造型 effortless。",
+        items: [
+          {
+            name: "fine-knit merino sweater",
+            category: "top",
+            why: "Skims the torso without adding bulk and works across seasons.",
+            colors: ["ivory", "taupe"],
+            fitNotes: "Fitted through the shoulders with a subtle drape at the waist.",
+            optional: false,
+          },
+          {
+            name: "high-waisted wide-leg trousers",
+            category: "bottom",
+            why: "Creates a long vertical line that flatters most proportions.",
+            colors: ["charcoal", "warm beige"],
+            fitNotes: "Waistband sits at the natural waist; length skims the top of the shoe.",
+            optional: false,
+          },
+          {
+            name: "longline wool coat",
+            category: "outerwear",
+            why: "Adds drama and structure while keeping the silhouette streamlined.",
+            colors: ["camel", "soft white"],
+            fitNotes: "Shoulders aligned, hem below the knee for maximum elongation.",
+            optional: false,
+          },
+          {
+            name: "minimalist leather ankle boots",
+            category: "shoes",
+            why: "Grounds wide-leg bottoms with a clean, low profile.",
+            colors: ["tan", "black"],
+            fitNotes: "Low block heel; shaft height that sits just above the ankle bone.",
+            optional: false,
+          },
+          {
+            name: "small structured leather crossbody bag",
+            category: "bag",
+            why: "Adds polish without competing with the clean lines of the outfit.",
+            colors: ["black", "cognac"],
+            fitNotes: "Compact; strap length so the bag rests at the high hip.",
+            optional: true,
+          },
+        ],
       };
     case "OTHER":
       return {
@@ -93,6 +188,48 @@ function baseStyle(gender: MockStyleInput["gender"]) {
           "A tousled pixie, shoulder-length layered cut, or simple top knot all fit; keep maintenance low. / 凌乱短发、及肩层次剪或简单丸子头都可以，保持低维护。",
         shoesAdvice:
           "Chunky derbies, clean canvas sneakers, or Chelsea boots add structure without leaning masculine or feminine. / 厚底德比鞋、干净帆布运动鞋或切尔西靴，增加结构感而不偏向某一性别。",
+        items: [
+          {
+            name: "oversized button-down shirt",
+            category: "top",
+            why: "Creates balanced volume that sits outside traditional fitted silhouettes.",
+            colors: ["ecru", "sage green"],
+            fitNotes: "Slightly dropped shoulder; length covers half the hip.",
+            optional: false,
+          },
+          {
+            name: "straight-cut tailored trousers",
+            category: "bottom",
+            why: "A clean, unisex cut that anchors an oversized top with structure.",
+            colors: ["slate gray", "black"],
+            fitNotes: "Mid-rise, straight from hip to hem with a clean break.",
+            optional: false,
+          },
+          {
+            name: "relaxed chore jacket",
+            category: "outerwear",
+            why: "Adds utilitarian structure without reading as formal outerwear.",
+            colors: ["tan", "olive"],
+            fitNotes: "Boxy but not oversized; hem at the high hip.",
+            optional: false,
+          },
+          {
+            name: "chunky leather derbies",
+            category: "shoes",
+            why: "Adds grounding weight and a modern, gender-neutral finish.",
+            colors: ["black", "dark brown"],
+            fitNotes: "Round toe, sturdy sole, laced snugly.",
+            optional: false,
+          },
+          {
+            name: "canvas tote bag",
+            category: "bag",
+            why: "Practical, low-key carryall that matches the relaxed utilitarian mood.",
+            colors: ["natural canvas", "black"],
+            fitNotes: "Medium size with short handles for hand or shoulder carry.",
+            optional: true,
+          },
+        ],
       };
   }
 }

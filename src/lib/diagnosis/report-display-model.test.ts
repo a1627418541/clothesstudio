@@ -44,9 +44,22 @@ function v2Record(index: number, overrides: Record<string, unknown> = {}) {
     shoesAdvice: "MUTATED LEGACY SHOES",
     colorPalette: ["mutated-color"],
     avoidTips: ["mutated-avoid"],
+    items: [
+      {
+        name: "structured wool blazer",
+        category: "outerwear",
+        why: "Adds structure.",
+        colors: ["navy"],
+        fitNotes: "Slim fit.",
+        optional: false,
+      },
+    ],
     previewImageUrl: null,
     previewImageStatus: "PENDING",
     previewImageError: null,
+    tryOnImageUrl: null,
+    tryOnImageStatus: "PENDING",
+    tryOnImageError: null,
     archetype: {
       id: "live-mutated",
       name: "LIVE MUTATED NAME",
@@ -75,9 +88,22 @@ function legacyRecord(index: number, overrides: Record<string, unknown> = {}) {
     shoesAdvice: `Legacy shoes ${index + 1}`,
     colorPalette: ["navy"],
     avoidTips: ["loud logos"],
+    items: [
+      {
+        name: "legacy oxford shirt",
+        category: "top",
+        why: "Classic base.",
+        colors: ["navy", "white"],
+        fitNotes: "Tailored.",
+        optional: false,
+      },
+    ],
     previewImageUrl: null,
     previewImageStatus: "PENDING",
     previewImageError: null,
+    tryOnImageUrl: null,
+    tryOnImageStatus: "PENDING",
+    tryOnImageError: null,
     archetype:
       index === 0
         ? {

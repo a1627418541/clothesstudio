@@ -1,4 +1,5 @@
 import { RecommendationSource } from "@prisma/client";
+import { RecommendationItem } from "@/lib/ai/style-ai-provider";
 import {
   parseV2RecommendationSet,
   StyleRecommendationSnapshotInput,
@@ -28,9 +29,13 @@ export interface ReportRecommendationRecord
   shoesAdvice: string;
   colorPalette: string[];
   avoidTips: string[];
+  items: unknown;
   previewImageUrl: string | null;
   previewImageStatus: string;
   previewImageError: string | null;
+  tryOnImageUrl: string | null;
+  tryOnImageStatus: string;
+  tryOnImageError: string | null;
   archetype?: ReportArchetypeMetadata | null;
 }
 
@@ -41,6 +46,25 @@ export interface ReportProjectionResult {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isValidRecommendationItem(value: unknown): value is RecommendationItem {
+  if (!isRecord(value)) return false;
+  const categories = ["top", "bottom", "outerwear", "dress", "shoes", "accessory", "bag"] as const;
+  return (
+    typeof value.name === "string" &&
+    typeof value.why === "string" &&
+    typeof value.fitNotes === "string" &&
+    typeof value.optional === "boolean" &&
+    categories.includes(value.category as RecommendationItem["category"]) &&
+    Array.isArray(value.colors) &&
+    value.colors.every((color) => typeof color === "string")
+  );
+}
+
+function normalizeItems(items: unknown): RecommendationItem[] {
+  if (!Array.isArray(items)) return [];
+  return items.filter(isValidRecommendationItem);
 }
 
 function hasUnsupportedSnapshotVersion(
@@ -122,9 +146,13 @@ function buildV2Model(
         snapshot.styleDNA.avoidDNA,
         ...snapshot.styleDNA.forbiddenItems,
       ],
+      items: normalizeItems(record.items),
       previewImageUrl: record.previewImageUrl,
       previewImageStatus: record.previewImageStatus,
       previewImageError: record.previewImageError,
+      tryOnImageUrl: record.tryOnImageUrl,
+      tryOnImageStatus: record.tryOnImageStatus,
+      tryOnImageError: record.tryOnImageError,
       archetype: {
         id: snapshot.provenance.archetypeId,
         name: snapshot.identity.name,
@@ -172,6 +200,7 @@ function buildLegacyModel(
       shoesAdvice: record.shoesAdvice,
       colorPalette: [...record.colorPalette],
       avoidTips: [...record.avoidTips],
+      items: normalizeItems(record.items),
       previewImageUrl: record.previewImageUrl,
       previewImageStatus:
         isTrueLegacy
@@ -180,6 +209,9 @@ function buildLegacyModel(
             ? "COMPLETED"
             : "FAILED",
       previewImageError: record.previewImageError,
+      tryOnImageUrl: record.tryOnImageUrl,
+      tryOnImageStatus: record.tryOnImageStatus,
+      tryOnImageError: record.tryOnImageError,
       archetype: isTrueLegacy ? record.archetype ?? null : null,
       matchScore: record.matchScore,
       personalityLabel: isTrueLegacy

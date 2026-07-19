@@ -41,6 +41,8 @@ export interface RunStylePreviewAttemptInput {
   expectedStatus: StylePreviewExpectedStatus;
   finalPrompt: string;
   compilerVersion: number | null;
+  faceImageUrl?: string;
+  faceTryOnConsent?: boolean;
 }
 
 export interface ClaimedStylePreviewAttempt {
@@ -196,6 +198,9 @@ async function persistCompleted(
         previewImageStatus: "COMPLETED",
         previewImageUrl: result.url,
         previewImageError: null,
+        tryOnImageStatus: result.tryOnUrl ? "COMPLETED" : "PENDING",
+        tryOnImageUrl: result.tryOnUrl ?? null,
+        tryOnImageError: null,
       },
     });
     await tx.aiJob.update({
@@ -320,6 +325,8 @@ export async function runStylePreviewAttempt(
       diagnosisId: input.recommendation.diagnosisId,
       recommendationId: input.recommendation.id,
       prompt: input.finalPrompt,
+      faceImageUrl: input.faceImageUrl,
+      faceTryOnConsent: input.faceTryOnConsent,
     });
   } catch {
     result = {
@@ -336,7 +343,7 @@ export async function runStylePreviewAttempt(
       await persistCompleted(input, claim, result, now);
       return {
         status: "COMPLETED",
-        url: result.url,
+        url: result.tryOnUrl ?? result.url,
         correlationId: claim.correlationId,
         attemptNumber: claim.attemptNumber,
       };

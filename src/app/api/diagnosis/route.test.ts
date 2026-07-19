@@ -52,6 +52,16 @@ const analysisOutput = {
       shoesAdvice: "Wear minimal sneakers.",
       colorPalette: ["navy", "white"],
       avoidTips: ["Avoid clutter."],
+      items: [
+        {
+          name: "oxford shirt",
+          category: "top",
+          why: "Clean base layer.",
+          colors: ["white", "navy"],
+          fitNotes: "Tailored fit.",
+          optional: false,
+        },
+      ],
     },
     {
       title: "Smart Casual",
@@ -62,6 +72,16 @@ const analysisOutput = {
       shoesAdvice: "Wear loafers.",
       colorPalette: ["camel", "navy"],
       avoidTips: ["Avoid loud logos."],
+      items: [
+        {
+          name: "knit polo",
+          category: "top",
+          why: "Adds texture.",
+          colors: ["camel"],
+          fitNotes: "Fitted.",
+          optional: false,
+        },
+      ],
     },
     {
       title: "Modern Casual",
@@ -72,6 +92,16 @@ const analysisOutput = {
       shoesAdvice: "Wear clean sneakers.",
       colorPalette: ["gray", "black"],
       avoidTips: ["Avoid excess color."],
+      items: [
+        {
+          name: "textured t-shirt",
+          category: "top",
+          why: "Modern base.",
+          colors: ["gray"],
+          fitNotes: "Regular.",
+          optional: false,
+        },
+      ],
     },
   ],
 };
@@ -92,6 +122,7 @@ const requestBody = {
   age: 30,
   heightCm: 178,
   weightKg: 74,
+  faceTryOnConsent: false,
   photoAssetIds: {
     FACE_FRONT: "asset-front",
     FACE_SIDE: "asset-side",

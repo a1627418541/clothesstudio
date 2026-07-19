@@ -15,6 +15,15 @@ export interface StyleAiInput {
   photoUrls: StyleAiPhotoUrls;
 }
 
+export interface RecommendationItem {
+  name: string;
+  category: "top" | "bottom" | "outerwear" | "dress" | "shoes" | "accessory" | "bag";
+  why: string;
+  colors: string[];
+  fitNotes: string;
+  optional: boolean;
+}
+
 export interface StyleRecommendationOutput {
   title: string;
   description: string;
@@ -24,6 +33,7 @@ export interface StyleRecommendationOutput {
   shoesAdvice: string;
   colorPalette: string[];
   avoidTips: string[];
+  items: RecommendationItem[];
 }
 
 export interface StyleAiOutput {

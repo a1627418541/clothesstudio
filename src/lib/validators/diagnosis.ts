@@ -12,6 +12,7 @@ export const diagnosisFormSchema = z.object({
   heightCm: z.number().int().min(120).max(230),
   weightKg: z.number().int().min(30).max(200),
   photoAssetIds: diagnosisPhotoAssetIdsSchema,
+  faceTryOnConsent: z.boolean().default(false),
 });
 
 export type DiagnosisFormInput = z.infer<typeof diagnosisFormSchema>;

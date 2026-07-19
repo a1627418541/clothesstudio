@@ -75,6 +75,7 @@ function v2Recommendation(
     hairstyleAdvice: "legacy mirror hair",
     shoesAdvice: "legacy mirror shoes",
     colorPalette: ["black"],
+    items: [],
   };
 }
 
@@ -101,6 +102,7 @@ function legacyRecommendation(
     hairstyleAdvice: "Legacy hairstyle advice",
     shoesAdvice: "Legacy shoes advice",
     colorPalette: ["navy", "white"],
+    items: [],
   };
 }
 
@@ -115,6 +117,21 @@ function diagnosis(recommendations: unknown[]) {
     weightKg: 72,
     bodyType: "rectangle",
     faceShape: "oval",
+    faceTryOnConsent: true,
+    photos: [
+      {
+        role: "FACE_FRONT",
+        mediaAsset: { url: "https://assets/face-front.jpg" },
+      },
+      {
+        role: "FACE_SIDE",
+        mediaAsset: { url: "https://assets/face-side.jpg" },
+      },
+      {
+        role: "FULL_BODY",
+        mediaAsset: { url: "https://assets/full-body.jpg" },
+      },
+    ],
     recommendations,
   };
 }
@@ -173,6 +190,8 @@ describe("POST /api/diagnosis/[id]/style-previews", () => {
           expectedStatus: "PENDING",
           finalPrompt: expectedPrompt,
           compilerVersion: STYLE_PREVIEW_COMPILER_VERSION,
+          faceImageUrl: "https://assets/face-front.jpg",
+          faceTryOnConsent: true,
         })
       );
     });
@@ -238,6 +257,29 @@ describe("POST /api/diagnosis/[id]/style-previews", () => {
       ok: true,
       data: { updated: 0, skipped: 2, failed: 0 },
     });
+  });
+
+  it("does not pass face image or consent when diagnosis has not consented", async () => {
+    const recommendations = [legacyRecommendation(0, "PENDING")];
+    mocks.findDiagnosis.mockResolvedValue({
+      ...diagnosis(recommendations),
+      faceTryOnConsent: false,
+      photos: [
+        {
+          role: "FACE_FRONT",
+          mediaAsset: { url: "https://assets/face-front.jpg" },
+        },
+      ],
+    });
+
+    await POST(request(), context);
+
+    expect(mocks.runAttempt).toHaveBeenCalledWith(
+      expect.objectContaining({
+        faceTryOnConsent: false,
+        faceImageUrl: "https://assets/face-front.jpg",
+      })
+    );
   });
 
   it("skips completed and processing records before any attempt", async () => {

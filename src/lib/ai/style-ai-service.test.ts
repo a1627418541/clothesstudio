@@ -40,6 +40,16 @@ const output: StyleAiOutput = {
     shoesAdvice: `Shoes ${rank}`,
     colorPalette: ["navy"],
     avoidTips: ["loud logos"],
+    items: [
+      {
+        name: `structured blazer ${rank}`,
+        category: "outerwear" as const,
+        why: "Adds clean structure.",
+        colors: ["navy"],
+        fitNotes: "Slim but not tight.",
+        optional: false,
+      },
+    ],
   })),
 };
 

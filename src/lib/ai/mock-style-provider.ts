@@ -29,6 +29,7 @@ export class MockStyleProvider implements StyleAiProvider {
       shoesAdvice: rec.shoesAdvice,
       colorPalette: rec.colorPalette,
       avoidTips: rec.avoidTips,
+      items: rec.items,
     }));
 
     return {

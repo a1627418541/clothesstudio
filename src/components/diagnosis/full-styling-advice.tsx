@@ -2,6 +2,7 @@ import { Footprints, Scissors, Shirt } from "lucide-react";
 import { EditorialLabel } from "@/components/ui/editorial-label";
 import { ReportRecommendation } from "@/types/diagnosis";
 import { ColorPalette } from "./color-palette";
+import { RecommendationItems } from "./recommendation-items";
 import { RecommendationMeta } from "./recommendation-meta";
 
 const adviceBlocks = [
@@ -39,6 +40,14 @@ export function FullStylingAdvice({ recommendations }: { recommendations: Report
                 </div>
               ))}
             </div>
+            {recommendation.items.length > 0 ? (
+              <div className="mt-7 border-t border-[var(--line)] pt-6">
+                <h4 className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink)]">Shop the look</h4>
+                <div className="mt-4">
+                  <RecommendationItems items={recommendation.items} />
+                </div>
+              </div>
+            ) : null}
             <div className="mt-7 grid grid-cols-[1fr_1fr] gap-10 border-t border-[var(--line)] pt-6">
               <div><p className="mb-4 text-xs font-semibold uppercase tracking-[0.14em]">Recommended colors</p><ColorPalette colors={recommendation.colorPalette} /></div>
               {recommendation.avoidTips.length > 0 ? <div><p className="mb-4 text-xs font-semibold uppercase tracking-[0.14em]">Avoid</p><p className="text-sm leading-6 text-[var(--muted-ink)]">{recommendation.avoidTips.join(" · ")}</p></div> : null}

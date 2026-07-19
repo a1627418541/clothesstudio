@@ -7,7 +7,7 @@ import {
 const baseInput = {
   diagnosis: {
     id: "diagnosis-1",
-    gender: "FEMALE",
+    gender: "FEMALE" as const,
     age: 30,
     heightCm: 168,
     weightKg: 58,
@@ -24,6 +24,16 @@ const baseInput = {
     hairstyleAdvice: "Soft waves",
     shoesAdvice: "Minimal flats",
     colorPalette: ["ivory", "taupe", "charcoal"],
+    items: [
+      {
+        name: "fine-knit merino sweater",
+        category: "top" as const,
+        why: "Soft base.",
+        colors: ["ivory"],
+        fitNotes: "Fitted.",
+        optional: false,
+      },
+    ],
   },
 };
 
@@ -56,6 +66,10 @@ describe("generateStylePreviewImage persistence", () => {
         getProvider: () => ({
           name: "mock",
           provider: { generate: providerGenerate },
+        }),
+        getFaceSwapProvider: () => ({
+          name: "mock",
+          provider: { swap: vi.fn() },
         }),
         mockProvider: { generate: vi.fn() },
         storeImage: vi.fn().mockResolvedValue({
@@ -90,6 +104,10 @@ describe("generateStylePreviewImage persistence", () => {
           }),
         },
       }),
+      getFaceSwapProvider: () => ({
+        name: "mock",
+        provider: { swap: vi.fn() },
+      }),
       mockProvider: {
         generate: vi.fn().mockResolvedValue({
           url: "https://images.example.com/fallback.jpg",
@@ -121,6 +139,10 @@ describe("generateStylePreviewImage persistence", () => {
             url: "https://provider.example.com/temporary.png",
           }),
         },
+      }),
+      getFaceSwapProvider: () => ({
+        name: "mock",
+        provider: { swap: vi.fn() },
       }),
       mockProvider: {
         generate: vi.fn(),
@@ -159,6 +181,7 @@ describe("generateStylePreviewImage archetype prompt", () => {
 
     const result = await generateStylePreviewImage(input, {
       getProvider: () => ({ name: "openai", provider: { generate: providerGenerate } }),
+      getFaceSwapProvider: () => ({ name: "mock", provider: { swap: vi.fn() } }),
       mockProvider: { generate: vi.fn() },
       storeImage,
       shouldFallbackToMock: () => false,
@@ -187,6 +210,7 @@ describe("generateStylePreviewImage archetype prompt", () => {
 
     const result = await generateStylePreviewImage(baseInput, {
       getProvider: () => ({ name: "openai", provider: { generate: providerGenerate } }),
+      getFaceSwapProvider: () => ({ name: "mock", provider: { swap: vi.fn() } }),
       mockProvider: { generate: vi.fn() },
       storeImage,
       shouldFallbackToMock: () => false,
@@ -195,6 +219,11 @@ describe("generateStylePreviewImage archetype prompt", () => {
     expect(providerGenerate).toHaveBeenCalledWith(
       expect.objectContaining({
         prompt: expect.stringContaining("Soft Minimal"),
+      })
+    );
+    expect(providerGenerate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prompt: expect.stringContaining("fine-knit merino sweater"),
       })
     );
     expect(result.status).toBe("COMPLETED");
