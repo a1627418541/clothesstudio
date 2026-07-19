@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { gender, age, heightCm, weightKg, photoAssetIds } = parsed.data;
+    const { gender, age, heightCm, weightKg, photoAssetIds, faceTryOnConsent } = parsed.data;
 
     const assetIds = Object.values(photoAssetIds);
     const assets = await prisma.mediaAsset.findMany({
@@ -86,6 +86,8 @@ export async function POST(request: NextRequest) {
           heightCm,
           weightKg,
           status: "SUBMITTED",
+          faceTryOnConsent,
+          faceTryOnConsentAt: faceTryOnConsent ? new Date() : null,
         },
       });
 

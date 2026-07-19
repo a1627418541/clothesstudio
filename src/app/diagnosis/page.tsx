@@ -54,6 +54,7 @@ export default function DiagnosisPage() {
     age: "",
     heightCm: "",
     weightKg: "",
+    faceTryOnConsent: false,
   });
 
   const [formErrors, setFormErrors] = useState<Partial<Record<keyof DiagnosisFormInput | "photoAssetIds", string>>>({});
@@ -138,6 +139,7 @@ export default function DiagnosisPage() {
       heightCm: form.heightCm ? Number(form.heightCm) : undefined,
       weightKg: form.weightKg ? Number(form.weightKg) : undefined,
       photoAssetIds,
+      faceTryOnConsent: form.faceTryOnConsent,
     };
 
     try {
@@ -374,6 +376,21 @@ export default function DiagnosisPage() {
                     </div>
                     {formErrors.weightKg ? <p id="weight-error" className="mt-2 text-sm text-[var(--error)]">{formErrors.weightKg}</p> : null}
                   </div>
+                </div>
+
+                <div className="mt-6 border border-[var(--line)] bg-[var(--paper)] p-5">
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={form.faceTryOnConsent}
+                      onChange={(event) => setForm({ ...form, faceTryOnConsent: event.target.checked })}
+                      className="mt-0.5 h-4 w-4 accent-[var(--oxblood)]"
+                    />
+                    <span className="text-sm leading-6 text-[var(--muted-ink)]">
+                      我同意将我的正面照片用于 AI 生成试穿效果图。该图仅用于本次诊断展示，不会用于其他目的。
+                      <span className="block text-xs text-[var(--muted-ink)]/70 mt-1">AI 生成效果图仅供参考，效果因照片质量而异。</span>
+                    </span>
+                  </label>
                 </div>
 
                 {submitError ? <div className="mt-6 border border-[var(--error)] bg-[#fbf3f1] p-4 text-sm text-[var(--error)]" role="alert">{submitError}</div> : null}

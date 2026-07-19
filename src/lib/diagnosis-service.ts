@@ -97,9 +97,13 @@ export async function getDiagnosisDetailForViewer({
       shoesAdvice: rec.shoesAdvice,
       colorPalette: rec.colorPalette,
       avoidTips: rec.avoidTips,
+      items: rec.items,
       previewImageUrl: rec.previewImageUrl,
       previewImageStatus: rec.previewImageStatus,
       previewImageError: rec.previewImageError,
+      tryOnImageUrl: rec.tryOnImageUrl,
+      tryOnImageStatus: rec.tryOnImageStatus,
+      tryOnImageError: rec.tryOnImageError,
       archetype: null,
     }));
 

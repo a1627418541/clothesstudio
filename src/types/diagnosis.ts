@@ -1,4 +1,5 @@
 import type { MacroCategory, RecommendationSource } from "@prisma/client";
+import type { RecommendationItem } from "@/lib/ai/style-ai-provider";
 
 export interface ReportArchetypeMetadata {
   id: string;
@@ -20,9 +21,13 @@ interface BaseReportRecommendation {
   shoesAdvice: string;
   colorPalette: string[];
   avoidTips: string[];
+  items: RecommendationItem[];
   previewImageUrl: string | null;
   previewImageStatus: string;
   previewImageError: string | null;
+  tryOnImageUrl: string | null;
+  tryOnImageStatus: string;
+  tryOnImageError: string | null;
   archetype: ReportArchetypeMetadata | null;
   matchScore: number | null;
   personalityLabel: string | null;

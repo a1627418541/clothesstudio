@@ -1,6 +1,7 @@
 import { EditorialLabel } from "@/components/ui/editorial-label";
 import { ReportRecommendation } from "@/types/diagnosis";
 import { ColorPalette } from "./color-palette";
+import { RecommendationItems } from "./recommendation-items";
 import { RecommendationMeta } from "./recommendation-meta";
 import { StylePreviewImage } from "./style-preview-image";
 
@@ -17,10 +18,19 @@ export function AlternativeStyleCard({
     <article className="border border-[var(--line)] bg-[var(--surface)]">
       <div className="border-b border-[var(--line)] p-6">
         <StylePreviewImage
-          status={recommendation.previewImageStatus}
-          url={recommendation.previewImageUrl}
+          status={
+            recommendation.tryOnImageStatus === "COMPLETED" || recommendation.tryOnImageUrl
+              ? "COMPLETED"
+              : recommendation.previewImageStatus
+          }
+          url={recommendation.tryOnImageUrl ?? recommendation.previewImageUrl}
           title={recommendation.title}
           aspect="3/4"
+          disclosure={
+            recommendation.tryOnImageUrl
+              ? "AI 生成效果图，仅供参考"
+              : null
+          }
         />
       </div>
       <div className="p-7">
@@ -37,6 +47,14 @@ export function AlternativeStyleCard({
         </div>
         <p className="mt-5 text-sm leading-7 text-[var(--muted-ink)]">{recommendation.summary}</p>
         <div className="mt-6 border-t border-[var(--line)] pt-5"><ColorPalette colors={recommendation.colorPalette} /></div>
+        {recommendation.items.length > 0 ? (
+          <div className="mt-5 border-t border-[var(--line)] pt-5">
+            <h4 className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink)]">Top items</h4>
+            <div className="mt-3">
+              <RecommendationItems items={recommendation.items} limit={3} showOptional={false} />
+            </div>
+          </div>
+        ) : null}
         {recommendation.avoidTips.length > 0 ? (
           <p className="mt-5 border-l-2 border-[var(--oxblood)] pl-3 text-xs leading-5 text-[var(--muted-ink)]">
             Avoid: {recommendation.avoidTips.slice(0, 2).join(" · ")}

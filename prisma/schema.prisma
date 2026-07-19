@@ -189,6 +189,9 @@ model StyleDiagnosis {
   summary      String?
   status       StyleDiagnosisStatus @default(SUBMITTED)
 
+  faceTryOnConsent   Boolean   @default(false)
+  faceTryOnConsentAt DateTime?
+
   photos          DiagnosisPhoto[]
   recommendations StyleRecommendation[]
   generatedImages GeneratedImage[]
@@ -314,6 +317,9 @@ model StyleRecommendation {
   colorPalette    String[]
   avoidTips       String[]
 
+  // Item-level recommendations: structured list of specific garments/products
+  items Json?
+
   rank            Int            @default(0)
   isPrimary       Boolean        @default(false)
   sourceMode      RecommendationSource @default(LEGACY_AI)
@@ -324,6 +330,12 @@ model StyleRecommendation {
   previewImageError   String?
   promptCompilerVersion Int?
   previewAttemptCount   Int        @default(0)
+
+  // User-face try-on image fields (populated when face swap is enabled)
+  tryOnImageUrl     String?
+  tryOnImageStatus  ImageStatus @default(PENDING)
+  tryOnImagePrompt  String?     @db.Text
+  tryOnImageError   String?
 
   archetypeId String?
   archetype   StyleArchetype? @relation(fields: [archetypeId], references: [id], onDelete: SetNull)

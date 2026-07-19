@@ -5,6 +5,7 @@ interface StylePreviewImageProps {
   url: string | null;
   title: string;
   aspect?: "4/5" | "3/4" | "square";
+  disclosure?: string | null;
 }
 
 export function StylePreviewImage({
@@ -12,6 +13,7 @@ export function StylePreviewImage({
   url,
   title,
   aspect = "4/5",
+  disclosure = null,
 }: StylePreviewImageProps) {
   const aspectClass =
     aspect === "4/5"
@@ -44,14 +46,21 @@ export function StylePreviewImage({
   }
 
   return (
-    <div className={`w-full overflow-hidden rounded-[2px] ${aspectClass}`}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={url}
-        alt={`${title} style preview`}
-        className="h-full w-full object-cover"
-        loading="lazy"
-      />
+    <div className="w-full">
+      <div className={`w-full overflow-hidden rounded-[2px] ${aspectClass}`}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={url}
+          alt={`${title} style preview`}
+          className="h-full w-full object-cover"
+          loading="lazy"
+        />
+      </div>
+      {disclosure ? (
+        <p className="mt-2 text-[10px] uppercase tracking-[0.12em] text-[var(--muted-ink)]">
+          {disclosure}
+        </p>
+      ) : null}
     </div>
   );
 }

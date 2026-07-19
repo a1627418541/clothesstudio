@@ -39,6 +39,11 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     const diagnosis = await prisma.styleDiagnosis.findUnique({
       where: { id },
       include: {
+        photos: {
+          include: {
+            mediaAsset: true,
+          },
+        },
         recommendations: {
           orderBy: { rank: "asc" },
         },
@@ -67,6 +72,12 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     const v2Snapshots = containsV2
       ? parseV2RecommendationSet(diagnosis.recommendations)
       : null;
+
+    const faceFrontPhoto = diagnosis.photos.find(
+      (photo) => photo.role === "FACE_FRONT"
+    );
+    const faceImageUrl = faceFrontPhoto?.mediaAsset.url ?? undefined;
+    const faceTryOnConsent = diagnosis.faceTryOnConsent;
 
     if (containsV2 && !v2Snapshots) {
       return NextResponse.json({
@@ -127,6 +138,8 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
           expectedStatus: retryFailed ? "FAILED" : "PENDING",
           finalPrompt,
           compilerVersion,
+          faceImageUrl,
+          faceTryOnConsent,
         });
 
         if (result.status === "COMPLETED") return "updated" as const;

@@ -44,7 +44,8 @@ function projectAvoidTips(draft: V2RecommendationDraft): string[] {
 
 function v2CreateData(
   diagnosisId: string,
-  draft: V2RecommendationDraft
+  draft: V2RecommendationDraft,
+  itemsByRank: ReadonlyMap<number, Prisma.InputJsonValue>
 ): Prisma.StyleRecommendationUncheckedCreateInput {
   const { snapshot } = draft;
   return {
@@ -57,6 +58,7 @@ function v2CreateData(
     shoesAdvice: snapshot.styleDNA.shoesDNA,
     colorPalette: [...snapshot.styleDNA.colorDNA],
     avoidTips: projectAvoidTips(draft),
+    items: itemsByRank.get(snapshot.selection.rank) ?? Prisma.DbNull,
     rank: snapshot.selection.rank,
     isPrimary: snapshot.selection.rank === 1,
     sourceMode: "ARCHETYPE_V2",
@@ -78,6 +80,7 @@ function legacyCreateData(
     ...draft.recommendation,
     colorPalette: [...draft.recommendation.colorPalette],
     avoidTips: [...draft.recommendation.avoidTips],
+    items: draft.recommendation.items as unknown as Prisma.InputJsonValue,
     rank: draft.rank,
     isPrimary: draft.rank === 1,
     sourceMode: "LEGACY_AI",
@@ -90,13 +93,27 @@ function legacyCreateData(
   };
 }
 
+function buildItemsByRank(
+  analysisOutput: StyleAiOutput
+): ReadonlyMap<number, Prisma.InputJsonValue> {
+  const entries: [number, Prisma.InputJsonValue][] =
+    analysisOutput.recommendations.map((recommendation, index) => [
+      index + 1,
+      (recommendation.items ?? []) as unknown as Prisma.InputJsonValue,
+    ]);
+  return new Map(entries);
+}
+
 function recommendationCreateData(
   diagnosisId: string,
-  plan: RecommendationPlan
+  plan: RecommendationPlan,
+  analysisOutput: StyleAiOutput
 ): Prisma.StyleRecommendationUncheckedCreateInput[] {
-  return plan.mode === "ARCHETYPE_V2"
-    ? plan.drafts.map((draft) => v2CreateData(diagnosisId, draft))
-    : plan.drafts.map((draft) => legacyCreateData(diagnosisId, draft));
+  if (plan.mode === "ARCHETYPE_V2") {
+    const itemsByRank = buildItemsByRank(analysisOutput);
+    return plan.drafts.map((draft) => v2CreateData(diagnosisId, draft, itemsByRank));
+  }
+  return plan.drafts.map((draft) => legacyCreateData(diagnosisId, draft));
 }
 
 export async function persistRecommendationPlan(
@@ -114,7 +131,7 @@ export async function persistRecommendationPlan(
       },
     });
 
-    const rows = recommendationCreateData(input.diagnosisId, input.plan);
+    const rows = recommendationCreateData(input.diagnosisId, input.plan, input.analysisOutput);
     for (const data of rows) {
       await tx.styleRecommendation.create({ data });
     }
