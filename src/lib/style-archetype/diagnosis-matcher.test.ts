@@ -55,6 +55,16 @@ function makeRecommendation(
     shoesAdvice: "Shoes advice",
     colorPalette: ["navy", "white", "gray"],
     avoidTips: ["avoid"],
+    items: [
+      {
+        name: `${title} item`,
+        category: "top",
+        why: "Why this item.",
+        colors: ["navy"],
+        fitNotes: "Regular fit.",
+        optional: false,
+      },
+    ],
     ...preset,
     ...overrides,
   };

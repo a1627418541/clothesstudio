@@ -34,6 +34,16 @@ function legacyRecommendations(withRelation = false) {
     shoesAdvice: "Shoes",
     colorPalette: ["navy"],
     avoidTips: ["avoid"],
+    items: [
+      {
+        name: "oxford shirt",
+        category: "top",
+        why: "Clean base layer.",
+        colors: ["white", "navy"],
+        fitNotes: "Tailored through shoulders.",
+        optional: false,
+      },
+    ],
     previewImageUrl: null,
     previewImageStatus: "PENDING",
     previewImageError: null,
@@ -85,6 +95,16 @@ function v2Recommendations() {
       shoesAdvice: "Legacy mirror mutation",
       colorPalette: ["mutated"],
       avoidTips: ["mutated"],
+      items: [
+        {
+          name: "v2 tailored blazer",
+          category: "outerwear",
+          why: "Structured silhouette.",
+          colors: ["charcoal"],
+          fitNotes: "Slim cut.",
+          optional: false,
+        },
+      ],
       previewImageUrl: null,
       previewImageStatus: "PENDING",
       previewImageError: null,

@@ -29,6 +29,16 @@ function legacyRecommendations(label = "Legacy"): StyleRecommendationOutput[] {
     shoesAdvice: `${label} shoes ${rank}`,
     colorPalette: ["black", "white"],
     avoidTips: [`${label} avoid ${rank}`],
+    items: [
+      {
+        name: `${label} item ${rank}`,
+        category: "top" as const,
+        why: `Why ${label} item ${rank}`,
+        colors: ["black"],
+        fitNotes: "Regular fit.",
+        optional: false,
+      },
+    ],
   }));
 }
 

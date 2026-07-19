@@ -22,6 +22,16 @@ const output: StyleAiOutput = {
     shoesAdvice: `Legacy shoes ${rank}`,
     colorPalette: ["black", "white"],
     avoidTips: [`Legacy avoid ${rank}`],
+    items: [
+      {
+        name: `legacy item ${rank}`,
+        category: "top" as const,
+        why: `Why item ${rank}`,
+        colors: ["black"],
+        fitNotes: "Regular fit.",
+        optional: false,
+      },
+    ],
   })),
 };
 

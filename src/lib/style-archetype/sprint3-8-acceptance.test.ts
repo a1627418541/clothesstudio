@@ -42,6 +42,16 @@ function legacyRecommendations(): StyleRecommendationOutput[] {
     shoesAdvice: `Legacy shoes ${rank}`,
     colorPalette: ["navy", "white"],
     avoidTips: [`Legacy avoid ${rank}`],
+    items: [
+      {
+        name: `legacy item ${rank}`,
+        category: "top" as const,
+        why: `Why item ${rank}`,
+        colors: ["navy"],
+        fitNotes: "Regular fit.",
+        optional: false,
+      },
+    ],
   }));
 }
 
@@ -78,9 +88,22 @@ function v2RecordsFromPlan(
     shoesAdvice: "legacy mirror must not win",
     colorPalette: ["legacy-mirror"],
     avoidTips: ["legacy-mirror"],
+    items: [
+      {
+        name: "v2 blazer",
+        category: "outerwear",
+        why: "Structured.",
+        colors: ["charcoal"],
+        fitNotes: "Slim.",
+        optional: false,
+      },
+    ],
     previewImageUrl: null,
     previewImageStatus: "PENDING",
     previewImageError: null,
+    tryOnImageUrl: null,
+    tryOnImageStatus: "PENDING",
+    tryOnImageError: null,
     archetype: null,
   }));
 }
@@ -99,6 +122,9 @@ function legacyRecords(): ReportRecommendationRecord[] {
     previewImageUrl: null,
     previewImageStatus: "PENDING",
     previewImageError: null,
+    tryOnImageUrl: null,
+    tryOnImageStatus: "PENDING",
+    tryOnImageError: null,
     archetype: null,
   }));
 }
