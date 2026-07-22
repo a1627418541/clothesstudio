@@ -171,6 +171,13 @@ enum StyleDiagnosisStatus {
   DELETED
 }
 
+enum BudgetTier {
+  UNDER_500
+  FROM_500_TO_1000
+  FROM_1000_TO_2000
+  ABOVE_2000
+}
+
 model StyleDiagnosis {
   id                 String               @id @default(cuid())
   userId             String?
@@ -191,6 +198,8 @@ model StyleDiagnosis {
 
   faceTryOnConsent   Boolean   @default(false)
   faceTryOnConsentAt DateTime?
+  faceTryOnRevokedAt DateTime?
+  budgetTier         BudgetTier
 
   photos          DiagnosisPhoto[]
   recommendations StyleRecommendation[]
@@ -247,6 +256,44 @@ enum GenderScope {
 enum RecommendationSource {
   LEGACY_AI
   ARCHETYPE_V2
+}
+
+enum MarketplacePlatform {
+  TAOBAO
+  JD
+}
+
+enum MarketplaceProductCategory {
+  TOP
+  BOTTOM
+  OUTERWEAR
+  HAT
+}
+
+enum ProductAvailabilityStatus {
+  AVAILABLE
+  UNAVAILABLE
+  UNKNOWN
+}
+
+enum ProductPlanStatus {
+  PENDING
+  READY
+  FAILED
+  STALE
+}
+
+enum TryOnWorkflowStatus {
+  NOT_REQUESTED
+  QUEUED
+  APPLYING_GARMENTS
+  APPLYING_HAT
+  RESTORING_IDENTITY
+  QUALITY_CHECKING
+  COMPLETED
+  FAILED
+  CANCELLED
+  EXPIRED
 }
 
 enum MacroCategory {
@@ -337,6 +384,19 @@ model StyleRecommendation {
   tryOnImagePrompt  String?     @db.Text
   tryOnImageError   String?
 
+  marketplacePlatform      MarketplacePlatform?
+  productTotalCents        Int?
+  productPlanStatus        ProductPlanStatus       @default(PENDING)
+  products                 RecommendationProduct[]
+  tryOnWorkflowStatus      TryOnWorkflowStatus     @default(NOT_REQUESTED)
+  tryOnAttemptCount        Int                     @default(0)
+  tryOnFailureCode         String?
+  tryOnProvider            String?
+  identityScore            Float?
+  productFidelityScore     Float?
+  tryOnExpiresAt           DateTime?
+  tryOnProductSnapshotHash String?
+
   archetypeId String?
   archetype   StyleArchetype? @relation(fields: [archetypeId], references: [id], onDelete: SetNull)
 
@@ -348,6 +408,35 @@ model StyleRecommendation {
   updatedAt DateTime @updatedAt
 
   @@index([diagnosisId])
+}
+
+model RecommendationProduct {
+  id                 String                      @id @default(cuid())
+  recommendationId   String
+  recommendation     StyleRecommendation         @relation(fields: [recommendationId], references: [id], onDelete: Cascade)
+  platform           MarketplacePlatform
+  externalProductId  String
+  externalSkuId      String
+  category           MarketplaceProductCategory
+  title              String
+  imageUrl           String                      @db.Text
+  purchaseUrl        String                      @db.Text
+  priceCents         Int
+  currency           String                      @default("CNY")
+  sellerName         String
+  color              String
+  variantLabel       String
+  isOptional         Boolean                     @default(false)
+  availabilityStatus ProductAvailabilityStatus   @default(AVAILABLE)
+  snapshotAt         DateTime
+  position           Int
+  rawSnapshot        Json?
+  createdAt          DateTime                    @default(now())
+  updatedAt          DateTime                    @updatedAt
+
+  @@unique([recommendationId, position])
+  @@index([recommendationId, platform])
+  @@index([externalProductId, externalSkuId])
 }
 
 // AI jobs
