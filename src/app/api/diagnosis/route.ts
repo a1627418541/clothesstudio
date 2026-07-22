@@ -10,6 +10,24 @@ import {
   buildRecommendationPlan,
 } from "@/lib/style-archetype/recommendation-plan";
 import { persistRecommendationPlan } from "@/lib/style-archetype/recommendation-persistence";
+import { createMockProductProvider } from "@/lib/marketplace/mock-product-provider";
+import { matchOutfitProductPlans } from "@/lib/marketplace/outfit-product-matcher";
+import { persistRecommendationProductPlans } from "@/lib/marketplace/recommendation-product-service";
+
+function requiredItemNames(items: unknown): string[] {
+  if (!Array.isArray(items)) return [];
+  return items.flatMap((item) => {
+    if (
+      typeof item === "object" &&
+      item !== null &&
+      "category" in item &&
+      typeof item.category === "string"
+    ) {
+      return [item.category];
+    }
+    return [];
+  });
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -39,7 +57,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { gender, age, heightCm, weightKg, photoAssetIds, faceTryOnConsent } = parsed.data;
+    const {
+      gender,
+      age,
+      heightCm,
+      weightKg,
+      budgetTier,
+      photoAssetIds,
+      faceTryOnConsent,
+    } = parsed.data;
 
     const assetIds = Object.values(photoAssetIds);
     const assets = await prisma.mediaAsset.findMany({
@@ -85,6 +111,7 @@ export async function POST(request: NextRequest) {
           age,
           heightCm,
           weightKg,
+          budgetTier,
           status: "SUBMITTED",
           faceTryOnConsent,
           faceTryOnConsentAt: faceTryOnConsent ? new Date() : null,
@@ -163,6 +190,46 @@ export async function POST(request: NextRequest) {
         console.error("Failed to finalize AI job after persistence failure:", finalizeError);
       }
       throw error;
+    }
+
+    const savedRecommendations = await prisma.styleRecommendation.findMany({
+      where: { diagnosisId: diagnosis.id },
+      orderBy: { rank: "asc" },
+      select: {
+        id: true,
+        rank: true,
+        title: true,
+        colorPalette: true,
+        items: true,
+      },
+    });
+    try {
+      const productPlans = await matchOutfitProductPlans({
+        budgetTier,
+        providers: [
+          createMockProductProvider("TAOBAO"),
+          createMockProductProvider("JD"),
+        ],
+        recommendations: savedRecommendations.map((recommendation) => ({
+          rank: recommendation.rank,
+          title: recommendation.title,
+          colorPalette: recommendation.colorPalette,
+          requiredItems: requiredItemNames(recommendation.items),
+        })),
+      });
+      await persistRecommendationProductPlans({
+        client: prisma,
+        recommendations: savedRecommendations.map(({ id, rank }) => ({
+          id,
+          rank,
+        })),
+        plans: productPlans,
+      });
+    } catch {
+      await prisma.styleRecommendation.updateMany({
+        where: { id: { in: savedRecommendations.map(({ id }) => id) } },
+        data: { productPlanStatus: "FAILED" },
+      });
     }
 
     try {

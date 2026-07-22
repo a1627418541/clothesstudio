@@ -7,9 +7,14 @@ const mocks = vi.hoisted(() => ({
   getAnonymousSessionByToken: vi.fn(),
   findAssets: vi.fn(),
   findArchetypes: vi.fn(),
+  findRecommendations: vi.fn(),
+  markProductPlansFailed: vi.fn(),
+  styleDiagnosisCreate: vi.fn(),
   transaction: vi.fn(),
   analyze: vi.fn(),
   finalizeJob: vi.fn(),
+  matchOutfitProductPlans: vi.fn(),
+  persistRecommendationProductPlans: vi.fn(),
 }));
 
 vi.mock("@/lib/auth", () => ({ auth: mocks.auth }));
@@ -20,8 +25,18 @@ vi.mock("@/lib/prisma", () => ({
   prisma: {
     mediaAsset: { findMany: mocks.findAssets },
     styleArchetype: { findMany: mocks.findArchetypes },
+    styleRecommendation: {
+      findMany: mocks.findRecommendations,
+      updateMany: mocks.markProductPlansFailed,
+    },
     $transaction: mocks.transaction,
   },
+}));
+vi.mock("@/lib/marketplace/outfit-product-matcher", () => ({
+  matchOutfitProductPlans: mocks.matchOutfitProductPlans,
+}));
+vi.mock("@/lib/marketplace/recommendation-product-service", () => ({
+  persistRecommendationProductPlans: mocks.persistRecommendationProductPlans,
 }));
 vi.mock("@/lib/ai/style-ai-service", () => ({
   StyleAiService: class {
@@ -122,6 +137,7 @@ const requestBody = {
   age: 30,
   heightCm: 178,
   weightKg: 74,
+  budgetTier: "FROM_500_TO_1000",
   faceTryOnConsent: false,
   photoAssetIds: {
     FACE_FRONT: "asset-front",
@@ -163,10 +179,30 @@ describe("POST /api/diagnosis Archetype V2 integration", () => {
       errorMessage: null,
     });
     mocks.finalizeJob.mockResolvedValue(undefined);
+    mocks.styleDiagnosisCreate.mockResolvedValue(diagnosis);
+    mocks.findRecommendations.mockResolvedValue(
+      [1, 2, 3].map((rank) => ({
+        id: `rec-${rank}`,
+        rank,
+        title: `Direction ${rank}`,
+        colorPalette: ["brown", "cream"],
+        items: [{ category: "top" }, { category: "bottom" }, { category: "hat" }],
+      }))
+    );
+    mocks.matchOutfitProductPlans.mockResolvedValue(
+      [1, 2, 3].map((rank) => ({
+        rank,
+        platform: "TAOBAO",
+        products: [],
+        totalCents: 80_000,
+      }))
+    );
+    mocks.persistRecommendationProductPlans.mockResolvedValue(undefined);
+    mocks.markProductPlansFailed.mockResolvedValue({ count: 3 });
 
     const tx = {
       styleDiagnosis: {
-        create: vi.fn().mockResolvedValue(diagnosis),
+        create: mocks.styleDiagnosisCreate,
         update: vi.fn().mockResolvedValue({
           ...diagnosis,
           status: "PREVIEW_READY",
@@ -227,6 +263,34 @@ describe("POST /api/diagnosis Archetype V2 integration", () => {
     expect(
       createdRecommendations.every((row) => row.sourceMode === "LEGACY_AI")
     ).toBe(true);
+  });
+
+  it("persists the budget and attaches three marketplace product plans", async () => {
+    const response = await POST(makeRequest());
+
+    expect(response.status).toBe(201);
+    expect(mocks.styleDiagnosisCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        budgetTier: "FROM_500_TO_1000",
+      }),
+    });
+    expect(mocks.matchOutfitProductPlans).toHaveBeenCalledOnce();
+    expect(mocks.persistRecommendationProductPlans).toHaveBeenCalledOnce();
+  });
+
+  it("keeps the diagnosis successful when marketplace planning fails", async () => {
+    mocks.matchOutfitProductPlans.mockRejectedValueOnce(
+      new Error("NO_COMPLETE_SINGLE_PLATFORM_PLAN")
+    );
+
+    const response = await POST(makeRequest());
+
+    expect(response.status).toBe(201);
+    expect(mocks.persistRecommendationProductPlans).not.toHaveBeenCalled();
+    expect(mocks.markProductPlansFailed).toHaveBeenCalledWith({
+      where: { id: { in: ["rec-1", "rec-2", "rec-3"] } },
+      data: { productPlanStatus: "FAILED" },
+    });
   });
 
   it("writes three immutable V2 snapshots when the flag and candidates are ready", async () => {
