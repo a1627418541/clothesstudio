@@ -83,6 +83,76 @@ describe("Volcengine DressingDiffusionV2 provider", () => {
 
     await expect(provider.generate(input)).rejects.toThrow("VOLCENGINE_TIMEOUT");
   });
+
+  it("aborts a hanging getResult request at the deadline", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    try {
+      let receivedSignal: AbortSignal | undefined;
+      const client: VolcengineDressingClient = {
+        submit: vi.fn().mockResolvedValue({ taskId: "ve-hanging", requestId: "req-hanging" }),
+        getResult: vi.fn((_taskId: string, options?: { signal?: AbortSignal }) => {
+          if (!options?.signal) throw new Error("MISSING_SIGNAL");
+          const signal = options.signal;
+          receivedSignal = signal;
+          return new Promise<never>((_resolve, reject) => {
+            signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+          });
+        }),
+      };
+      const provider = createVolcengineDressingProvider(client, { pollIntervalMs: 10, timeoutMs: 50 });
+
+      const result = provider.generate(input);
+      const rejection = expect(result).rejects.toThrow("VOLCENGINE_TIMEOUT");
+      await vi.advanceTimersByTimeAsync(50);
+
+      await rejection;
+      expect(receivedSignal?.aborted).toBe(true);
+      expect(client.getResult).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("truncates sleep to the deadline and makes no second request", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    try {
+      const client: VolcengineDressingClient = {
+        submit: vi.fn().mockResolvedValue({ taskId: "ve-sleep", requestId: "req-sleep" }),
+        getResult: vi.fn().mockResolvedValue({ status: "running" }),
+      };
+      const provider = createVolcengineDressingProvider(client, { pollIntervalMs: 1_000, timeoutMs: 50 });
+
+      const result = provider.generate(input);
+      const rejection = expect(result).rejects.toThrow("VOLCENGINE_TIMEOUT");
+      await vi.advanceTimersByTimeAsync(50);
+
+      await rejection;
+      expect(client.getResult).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("rejects a done result that arrives after the deadline", async () => {
+    const now = vi.spyOn(Date, "now")
+      .mockReturnValueOnce(0)
+      .mockReturnValueOnce(0)
+      .mockReturnValueOnce(101);
+    try {
+      const client: VolcengineDressingClient = {
+        submit: vi.fn().mockResolvedValue({ taskId: "ve-late", requestId: "req-late" }),
+        getResult: vi.fn().mockResolvedValue({ status: "done", imageUrl: "https://result.example/late.jpg" }),
+      };
+      const provider = createVolcengineDressingProvider(client, { pollIntervalMs: 0, timeoutMs: 100 });
+
+      await expect(provider.generate(input)).rejects.toThrow("VOLCENGINE_TIMEOUT");
+      expect(client.getResult).toHaveBeenCalledTimes(1);
+    } finally {
+      now.mockRestore();
+    }
+  });
 });
 
 describe("Volcengine DressingDiffusionV2 SDK client", () => {
@@ -109,6 +179,12 @@ describe("Volcengine DressingDiffusionV2 SDK client", () => {
     const request = transport.mock.calls[0][0];
     expect(request.url).toBe("https://visual.volcengineapi.com/?Action=DressingDiffusionV2SubmitTask&Version=2024-06-06");
     expect(request.method).toBe("POST");
+    const signedHeaders = Object.fromEntries(
+      Object.entries(request.headers).map(([name, value]) => [name.toLowerCase(), value])
+    );
+    expect(signedHeaders.authorization).toMatch(/^HMAC-SHA256 /);
+    expect(signedHeaders["x-date"]).toMatch(/^\d{8}T\d{6}Z$/);
+    expect(signedHeaders["x-content-sha256"]).toMatch(/^[a-f0-9]{64}$/);
     expect(JSON.parse(request.body)).toEqual({
       req_key: "dressing_diffusionV2",
       model: { url: "https://input.example/person.jpg" },
@@ -123,11 +199,13 @@ describe("Volcengine DressingDiffusionV2 SDK client", () => {
       .mockResolvedValueOnce({ request_id: "poll-2", data: { status: "done", image_urls: ["https://result.example/done.jpg"] } });
     const client = createClient(transport);
 
-    await expect(client.getResult("task-2")).resolves.toEqual({ status: "running" });
+    const controller = new AbortController();
+    await expect(client.getResult("task-2", { signal: controller.signal })).resolves.toEqual({ status: "running" });
     await expect(client.getResult("task-2")).resolves.toEqual({ status: "done", imageUrl: "https://result.example/done.jpg" });
 
     const request = transport.mock.calls[0][0];
     expect(request.url).toBe("https://visual.volcengineapi.com/?Action=DressingDiffusionV2GetResult&Version=2024-06-06");
+    expect(request.signal).toBe(controller.signal);
     expect(JSON.parse(request.body)).toEqual({
       req_key: "dressing_diffusionV2",
       task_id: "task-2",

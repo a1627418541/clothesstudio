@@ -14,7 +14,7 @@ export interface VolcengineDressingClient {
     personImageUrl: string;
     garments: Array<{ type: SupportedGarmentType; imageUrl: string }>;
   }): Promise<{ taskId: string; requestId: string }>;
-  getResult(taskId: string): Promise<
+  getResult(taskId: string, options?: { signal?: AbortSignal }): Promise<
     | { status: "running" }
     | { status: "done"; imageUrl: string }
     | { status: "failed"; code: string }
@@ -26,6 +26,7 @@ export interface VolcengineHttpRequest {
   method: "POST";
   headers: Record<string, string>;
   body: string;
+  signal: AbortSignal;
 }
 
 export type VolcengineTransport = (request: VolcengineHttpRequest) => Promise<unknown>;
@@ -75,20 +76,45 @@ export function createVolcengineDressingProvider(
           imageUrl: input.garmentImageUrl,
         }],
       });
-      const startedAt = Date.now();
+      const deadline = Date.now() + timeoutMs;
 
       while (true) {
-        const result = await client.getResult(submitted.taskId);
+        const remainingBeforePoll = deadline - Date.now();
+        if (remainingBeforePoll <= 0) {
+          throw new Error("VOLCENGINE_TIMEOUT");
+        }
+
+        const controller = new AbortController();
+        const abortTimer = setTimeout(
+          () => controller.abort(new Error("VOLCENGINE_TIMEOUT")),
+          remainingBeforePoll
+        );
+        let result: Awaited<ReturnType<VolcengineDressingClient["getResult"]>>;
+        try {
+          result = await client.getResult(submitted.taskId, { signal: controller.signal });
+        } catch (error) {
+          if (controller.signal.aborted || Date.now() >= deadline) {
+            throw new Error("VOLCENGINE_TIMEOUT");
+          }
+          throw error;
+        } finally {
+          clearTimeout(abortTimer);
+        }
+
+        if (Date.now() >= deadline) {
+          throw new Error("VOLCENGINE_TIMEOUT");
+        }
         if (result.status === "done") {
           return { imageUrl: result.imageUrl, requestId: submitted.requestId };
         }
         if (result.status === "failed") {
           throw new Error(`VOLCENGINE_${result.code}`);
         }
-        if (Date.now() - startedAt >= timeoutMs) {
+        const remainingBeforeSleep = deadline - Date.now();
+        if (remainingBeforeSleep <= 0) {
           throw new Error("VOLCENGINE_TIMEOUT");
         }
-        await wait(pollIntervalMs);
+        await wait(Math.min(pollIntervalMs, remainingBeforeSleep));
       }
     },
   };
@@ -113,6 +139,7 @@ const defaultTransport: VolcengineTransport = async (request) => {
     method: request.method,
     headers: request.headers,
     body: request.body,
+    signal: request.signal,
   });
   const payload: unknown = await response.json();
   if (!response.ok) {
@@ -132,7 +159,11 @@ export function createVolcengineDressingSdkClient(
   const region = config.region ?? "cn-beijing";
   const transport = dependencies.transport ?? defaultTransport;
 
-  async function request(action: string, body: Record<string, unknown>): Promise<Record<string, unknown>> {
+  async function request(
+    action: string,
+    body: Record<string, unknown>,
+    signal: AbortSignal = new AbortController().signal
+  ): Promise<Record<string, unknown>> {
     const params = { Action: action, Version: VERSION };
     const headers: Record<string, string> = {
       Host: HOST,
@@ -158,6 +189,7 @@ export function createVolcengineDressingSdkClient(
       method: "POST",
       headers,
       body: serializedBody,
+      signal,
     }));
   }
 
@@ -181,12 +213,12 @@ export function createVolcengineDressingSdkClient(
       };
     },
 
-    async getResult(taskId) {
+    async getResult(taskId, options) {
       const response = await request("DressingDiffusionV2GetResult", {
         req_key: REQ_KEY,
         task_id: taskId,
         req_json: JSON.stringify({ return_url: true }),
-      });
+      }, options?.signal);
       const data = expectRecord(response.data);
       const status = expectString(data.status);
 
