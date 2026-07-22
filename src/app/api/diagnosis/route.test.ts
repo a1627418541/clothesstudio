@@ -389,10 +389,19 @@ describe("POST /api/diagnosis Archetype V2 integration", () => {
   it("marks the existing AI job PERSISTENCE_FAILED without writing legacy replacements", async () => {
     process.env.STYLE_ARCHETYPE_V2_ENABLED = "true";
     failPersistence = true;
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
 
     const response = await POST(makeRequest());
+    const body = await response.json();
 
     expect(response.status).toBe(500);
+    expect(body).toEqual({ error: "Diagnosis submission failed" });
+    expect(JSON.stringify(errorSpy.mock.calls)).not.toContain(
+      "Neon persistence failed"
+    );
+    expect(errorSpy).toHaveBeenCalledWith(
+      "Diagnosis submission error: DIAGNOSIS_SUBMISSION_FAILED"
+    );
     expect(createdRecommendations).toEqual([]);
     expect(mocks.analyze).toHaveBeenCalledOnce();
     expect(mocks.finalizeJob).toHaveBeenCalledWith(
@@ -406,5 +415,6 @@ describe("POST /api/diagnosis Archetype V2 integration", () => {
         correlationId: "diagnosis-job-1",
       }
     );
+    errorSpy.mockRestore();
   });
 });
