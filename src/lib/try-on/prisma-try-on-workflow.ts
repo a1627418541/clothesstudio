@@ -5,11 +5,13 @@ import {
   createMockTryOnQualityProvider,
   createMockVirtualTryOnProvider,
 } from "./mock-providers";
+import { createTencentVirtualTryOnProvider } from "./providers/tencent-virtual-try-on";
 import { runTryOnWorkflow as orchestrateTryOnWorkflow } from "./try-on-orchestrator";
 import type {
   RunTryOnWorkflowInput,
   TryOnWorkflowDependencies,
   TryOnWorkflowPersistence,
+  VirtualTryOnProvider,
 } from "./types";
 
 const ACTIVE_WORKFLOW_STATUSES: TryOnWorkflowStatus[] = [
@@ -148,9 +150,20 @@ function createPersistence(): TryOnWorkflowPersistence {
   };
 }
 
+function createProductionVirtualTryOnProvider(): VirtualTryOnProvider {
+  const tencent = createTencentVirtualTryOnProvider();
+  const mockHat = createMockVirtualTryOnProvider();
+
+  return {
+    name: tencent.name,
+    applyGarment: (input) => tencent.applyGarment(input),
+    applyHat: (input) => mockHat.applyHat(input),
+  };
+}
+
 export async function runTryOnWorkflow(input: RunTryOnWorkflowInput) {
   const dependencies: TryOnWorkflowDependencies = {
-    virtualTryOn: createMockVirtualTryOnProvider(),
+    virtualTryOn: createProductionVirtualTryOnProvider(),
     identityRestore: createMockIdentityRestoreProvider(),
     quality: createMockTryOnQualityProvider(),
     persistence: createPersistence(),

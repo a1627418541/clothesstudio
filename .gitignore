@@ -13,6 +13,7 @@
 # testing
 /coverage
 /artifacts/try-on-benchmark/
+/artifacts/try-on-benchmark-manifest/
 
 # next.js
 /.next/
