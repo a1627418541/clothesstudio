@@ -309,9 +309,13 @@ export async function POST(request: NextRequest) {
       },
       { status: 201 }
     );
-  } catch (error) {
-    console.error("Diagnosis submission error:", error);
-    const message = error instanceof Error ? error.message : "Diagnosis submission failed";
-    return NextResponse.json({ error: message }, { status: 500 });
+  } catch {
+    console.error(
+      "Diagnosis submission error: DIAGNOSIS_SUBMISSION_FAILED"
+    );
+    return NextResponse.json(
+      { error: "Diagnosis submission failed" },
+      { status: 500 }
+    );
   }
 }
