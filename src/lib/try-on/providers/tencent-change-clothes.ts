@@ -1,4 +1,4 @@
-import tencentcloud from "tencentcloud-sdk-nodejs-aiart";
+import { aiart } from "tencentcloud-sdk-nodejs-aiart";
 import type { BenchmarkGarmentCategory, DomesticTryOnProvider } from "../benchmark/types";
 
 const CATEGORY: Record<BenchmarkGarmentCategory, "Upper-body" | "Lower-body" | "Dress"> = {
@@ -46,7 +46,7 @@ export function createTencentChangeClothesSdkClient(config: {
   secretKey: string;
   region: string;
 }): TencentChangeClothesClient {
-  const Client = tencentcloud.aiart.v20221229.Client;
+  const Client = aiart.v20221229.Client;
   return new Client({
     credential: { secretId: config.secretId, secretKey: config.secretKey },
     region: config.region,
