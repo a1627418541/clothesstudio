@@ -48,6 +48,23 @@ export interface AnonymousMediaRetentionClient {
       data: { deletedAt: Date };
     }): Promise<unknown>;
   };
+  diagnosisPhoto: {
+    count(args: {
+      where: {
+        mediaAssetId: string;
+        diagnosis: {
+          OR: Array<
+            | { userId: { not: null } }
+            | { anonymousSessionId: null }
+            | {
+                deletedAt: null;
+                createdAt: { gt: Date };
+              }
+          >;
+        };
+      };
+    }): Promise<number>;
+  };
   styleRecommendation: {
     updateMany(args: {
       where: { diagnosisId: string };
@@ -138,6 +155,7 @@ export async function cleanupExpiredAnonymousMedia(input: {
     objectsDeleted: 0,
     errors: [],
   };
+  const deletedMediaAssetIds = new Set<string>();
 
   for (const diagnosis of diagnoses) {
     let allObjectsSucceeded = true;
@@ -148,7 +166,24 @@ export async function cleanupExpiredAnonymousMedia(input: {
     }
 
     for (const asset of assets.values()) {
-      if (asset.deletedAt) continue;
+      if (asset.deletedAt || deletedMediaAssetIds.has(asset.id)) continue;
+      const retainedReferenceCount = await input.client.diagnosisPhoto.count({
+        where: {
+          mediaAssetId: asset.id,
+          diagnosis: {
+            OR: [
+              { userId: { not: null } },
+              { anonymousSessionId: null },
+              {
+                deletedAt: null,
+                createdAt: { gt: cutoff },
+              },
+            ],
+          },
+        },
+      });
+      if (retainedReferenceCount > 0) continue;
+
       const objectId = `${asset.bucket}/${asset.key}`;
       try {
         if (!deletedObjects.has(objectId)) {
@@ -160,6 +195,7 @@ export async function cleanupExpiredAnonymousMedia(input: {
           where: { id: asset.id },
           data: { deletedAt: input.now },
         });
+        deletedMediaAssetIds.add(asset.id);
       } catch {
         allObjectsSucceeded = false;
         result.errors.push({

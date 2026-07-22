@@ -87,7 +87,16 @@ describe("POST try-on consent", () => {
     expect(mocks.updateRecommendations).toHaveBeenCalledWith({
       where: {
         diagnosisId: "diag-1",
-        tryOnWorkflowStatus: { in: ["QUEUED", "FAILED"] },
+        tryOnWorkflowStatus: {
+          in: [
+            "QUEUED",
+            "APPLYING_GARMENTS",
+            "APPLYING_HAT",
+            "RESTORING_IDENTITY",
+            "QUALITY_CHECKING",
+            "FAILED",
+          ],
+        },
       },
       data: { tryOnWorkflowStatus: "CANCELLED" },
     });
@@ -110,5 +119,21 @@ describe("POST try-on consent", () => {
 
     expect((await POST(request({ consent: true }), context)).status).toBe(403);
     expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
+  it("does not log storage details when consent persistence fails", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    mocks.transaction.mockRejectedValue(
+      new Error("r2://private-bucket/face.jpg?secret=storage-token")
+    );
+
+    const response = await POST(request({ consent: false }), context);
+
+    expect(response.status).toBe(500);
+    expect(JSON.stringify(errorSpy.mock.calls)).not.toContain("storage-token");
+    expect(errorSpy).toHaveBeenCalledWith(
+      "Try-on consent error: CONSENT_UPDATE_FAILED"
+    );
+    errorSpy.mockRestore();
   });
 });

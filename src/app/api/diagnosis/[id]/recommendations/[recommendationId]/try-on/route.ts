@@ -135,8 +135,8 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ ok: false, result }, { status: 409 });
     }
     return NextResponse.json({ ok: true, result });
-  } catch (error) {
-    console.error("Recommendation try-on error:", error);
+  } catch {
+    console.error("Recommendation try-on error: TRY_ON_REQUEST_FAILED");
     return NextResponse.json(
       { error: "TRY_ON_REQUEST_FAILED" },
       { status: 500 }

@@ -12,6 +12,14 @@ import type {
   TryOnWorkflowPersistence,
 } from "./types";
 
+const ACTIVE_WORKFLOW_STATUSES: TryOnWorkflowStatus[] = [
+  "QUEUED",
+  "APPLYING_GARMENTS",
+  "APPLYING_HAT",
+  "RESTORING_IDENTITY",
+  "QUALITY_CHECKING",
+];
+
 function createPersistence(): TryOnWorkflowPersistence {
   return {
     async claimAttempt(input) {
@@ -64,15 +72,30 @@ function createPersistence(): TryOnWorkflowPersistence {
     },
 
     async setStatus(recommendationId, status) {
-      await prisma.styleRecommendation.update({
-        where: { id: recommendationId },
+      const updated = await prisma.styleRecommendation.updateMany({
+        where: {
+          id: recommendationId,
+          tryOnWorkflowStatus: { in: ACTIVE_WORKFLOW_STATUSES },
+          diagnosis: {
+            faceTryOnConsent: true,
+            faceTryOnRevokedAt: null,
+          },
+        },
         data: { tryOnWorkflowStatus: status },
       });
+      return updated.count === 1;
     },
 
     async persistCompleted(input) {
-      await prisma.styleRecommendation.update({
-        where: { id: input.recommendationId },
+      const updated = await prisma.styleRecommendation.updateMany({
+        where: {
+          id: input.recommendationId,
+          tryOnWorkflowStatus: "QUALITY_CHECKING",
+          diagnosis: {
+            faceTryOnConsent: true,
+            faceTryOnRevokedAt: null,
+          },
+        },
         data: {
           tryOnImageUrl: input.imageUrl,
           tryOnImageStatus: "COMPLETED",
@@ -85,11 +108,19 @@ function createPersistence(): TryOnWorkflowPersistence {
           tryOnExpiresAt: input.tryOnExpiresAt,
         },
       });
+      return updated.count === 1;
     },
 
     async persistFailed(input) {
-      await prisma.styleRecommendation.update({
-        where: { id: input.recommendationId },
+      const updated = await prisma.styleRecommendation.updateMany({
+        where: {
+          id: input.recommendationId,
+          tryOnWorkflowStatus: { in: ACTIVE_WORKFLOW_STATUSES },
+          diagnosis: {
+            faceTryOnConsent: true,
+            faceTryOnRevokedAt: null,
+          },
+        },
         data: {
           tryOnImageStatus: "FAILED",
           tryOnImageError: input.failureCode,
@@ -97,11 +128,17 @@ function createPersistence(): TryOnWorkflowPersistence {
           tryOnFailureCode: input.failureCode,
         },
       });
+      return updated.count === 1;
     },
 
     async persistCancelled(input) {
-      await prisma.styleRecommendation.update({
-        where: { id: input.recommendationId },
+      await prisma.styleRecommendation.updateMany({
+        where: {
+          id: input.recommendationId,
+          tryOnWorkflowStatus: {
+            in: ["NOT_REQUESTED", "FAILED", ...ACTIVE_WORKFLOW_STATUSES],
+          },
+        },
         data: {
           tryOnWorkflowStatus: "CANCELLED",
           tryOnFailureCode: input.reason,

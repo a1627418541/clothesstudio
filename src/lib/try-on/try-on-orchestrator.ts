@@ -105,10 +105,13 @@ export async function runTryOnWorkflow(
     try {
       let composedImageUrl = input.fullBodyImageUrl;
       for (const product of garmentProducts) {
-        await dependencies.persistence.setStatus(
+        const statusUpdated = await dependencies.persistence.setStatus(
           input.recommendationId,
           "APPLYING_GARMENTS"
         );
+        if (!statusUpdated) {
+          return { status: "CANCELLED", reason: "CONSENT_REVOKED" };
+        }
         const result = await dependencies.virtualTryOn.applyGarment({
           personImageUrl: composedImageUrl,
           productImageUrl: product.imageUrl,
@@ -117,10 +120,13 @@ export async function runTryOnWorkflow(
         composedImageUrl = result.imageUrl;
       }
 
-      await dependencies.persistence.setStatus(
+      const hatStatusUpdated = await dependencies.persistence.setStatus(
         input.recommendationId,
         "APPLYING_HAT"
       );
+      if (!hatStatusUpdated) {
+        return { status: "CANCELLED", reason: "CONSENT_REVOKED" };
+      }
       const hatResult = await dependencies.virtualTryOn.applyHat({
         personImageUrl: composedImageUrl,
         productImageUrl: hat.imageUrl,
@@ -134,19 +140,32 @@ export async function runTryOnWorkflow(
         return cancelWorkflow(input, dependencies, "CONSENT_REVOKED");
       }
 
-      await dependencies.persistence.setStatus(
+      const identityStatusUpdated = await dependencies.persistence.setStatus(
         input.recommendationId,
         "RESTORING_IDENTITY"
       );
+      if (!identityStatusUpdated) {
+        return { status: "CANCELLED", reason: "CONSENT_REVOKED" };
+      }
       const restored = await dependencies.identityRestore.restore({
         composedImageUrl,
         faceImageUrl: input.faceImageUrl,
       });
 
-      await dependencies.persistence.setStatus(
+      const consentBeforeQuality = await dependencies.persistence.readConsent(
+        input.diagnosisId
+      );
+      if (!consentBeforeQuality) {
+        return cancelWorkflow(input, dependencies, "CONSENT_REVOKED");
+      }
+
+      const qualityStatusUpdated = await dependencies.persistence.setStatus(
         input.recommendationId,
         "QUALITY_CHECKING"
       );
+      if (!qualityStatusUpdated) {
+        return { status: "CANCELLED", reason: "CONSENT_REVOKED" };
+      }
       const quality = await dependencies.quality.evaluate({
         imageUrl: restored.imageUrl,
         faceImageUrl: input.faceImageUrl,
@@ -154,7 +173,13 @@ export async function runTryOnWorkflow(
       });
       if (!quality.passed) continue;
 
-      await dependencies.persistence.persistCompleted({
+      const consentBeforeCompletion =
+        await dependencies.persistence.readConsent(input.diagnosisId);
+      if (!consentBeforeCompletion) {
+        return cancelWorkflow(input, dependencies, "CONSENT_REVOKED");
+      }
+
+      const completed = await dependencies.persistence.persistCompleted({
         recommendationId: input.recommendationId,
         imageUrl: restored.imageUrl,
         identityScore: quality.identityScore,
@@ -162,20 +187,29 @@ export async function runTryOnWorkflow(
         providerName: dependencies.virtualTryOn.name,
         tryOnExpiresAt: expiresAtFor(input),
       });
+      if (!completed) {
+        return { status: "CANCELLED", reason: "CONSENT_REVOKED" };
+      }
       return { status: "COMPLETED", attemptNumber: claim.attemptNumber };
     } catch {
       if (compositionAttempt < 2) continue;
-      await dependencies.persistence.persistFailed({
+      const failed = await dependencies.persistence.persistFailed({
         recommendationId: input.recommendationId,
         failureCode: "PROVIDER_FAILED",
       });
+      if (!failed) {
+        return { status: "CANCELLED", reason: "CONSENT_REVOKED" };
+      }
       return { status: "FAILED", reason: "PROVIDER_FAILED" };
     }
   }
 
-  await dependencies.persistence.persistFailed({
+  const failed = await dependencies.persistence.persistFailed({
     recommendationId: input.recommendationId,
     failureCode: "QUALITY_CHECK_FAILED",
   });
+  if (!failed) {
+    return { status: "CANCELLED", reason: "CONSENT_REVOKED" };
+  }
   return { status: "FAILED", reason: "QUALITY_CHECK_FAILED" };
 }

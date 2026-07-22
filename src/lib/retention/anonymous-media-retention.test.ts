@@ -10,6 +10,9 @@ function createClient(diagnoses: unknown[]) {
     mediaAsset: {
       update: vi.fn().mockResolvedValue({}),
     },
+    diagnosisPhoto: {
+      count: vi.fn().mockResolvedValue(0),
+    },
     styleRecommendation: {
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
@@ -151,6 +154,44 @@ describe("anonymous media retention", () => {
 
     expect(deleteObject).not.toHaveBeenCalled();
     expect(client.mediaAsset.update).not.toHaveBeenCalled();
+    expect(result.diagnosesExpired).toBe(1);
+  });
+
+  it("preserves a photo asset that is still referenced by a retained diagnosis", async () => {
+    const diagnosis = expiredDiagnosis();
+    diagnosis.recommendations = [];
+    const client = createClient([diagnosis]);
+    client.diagnosisPhoto.count.mockResolvedValue(1);
+    const deleteObject = vi.fn();
+    const now = new Date("2026-08-20T00:00:00.000Z");
+
+    const result = await cleanupExpiredAnonymousMedia({
+      client,
+      deleteObject,
+      now,
+    });
+
+    expect(client.diagnosisPhoto.count).toHaveBeenCalledWith({
+      where: {
+        mediaAssetId: "asset-face",
+        diagnosis: {
+          OR: [
+            { userId: { not: null } },
+            { anonymousSessionId: null },
+            {
+              deletedAt: null,
+              createdAt: { gt: new Date("2026-07-21T00:00:00.000Z") },
+            },
+          ],
+        },
+      },
+    });
+    expect(deleteObject).not.toHaveBeenCalled();
+    expect(client.mediaAsset.update).not.toHaveBeenCalled();
+    expect(client.styleDiagnosis.update).toHaveBeenCalledWith({
+      where: { id: "diagnosis-1" },
+      data: { deletedAt: now },
+    });
     expect(result.diagnosesExpired).toBe(1);
   });
 });
