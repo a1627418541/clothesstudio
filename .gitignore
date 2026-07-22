@@ -12,6 +12,7 @@
 
 # testing
 /coverage
+/artifacts/try-on-benchmark/
 
 # next.js
 /.next/

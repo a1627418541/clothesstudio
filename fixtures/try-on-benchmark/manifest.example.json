@@ -1,0 +1,14 @@
+{
+  "cases": [
+    { "caseId": "top-01", "personImageUrl": "https://example.com/person-01.jpg", "garmentImageUrl": "https://example.com/top-01.jpg", "category": "TOP" },
+    { "caseId": "top-02", "personImageUrl": "https://example.com/person-02.jpg", "garmentImageUrl": "https://example.com/top-02.jpg", "category": "TOP" },
+    { "caseId": "top-03", "personImageUrl": "https://example.com/person-03.jpg", "garmentImageUrl": "https://example.com/top-03.jpg", "category": "TOP" },
+    { "caseId": "top-04", "personImageUrl": "https://example.com/person-04.jpg", "garmentImageUrl": "https://example.com/top-04.jpg", "category": "TOP" },
+    { "caseId": "bottom-01", "personImageUrl": "https://example.com/person-05.jpg", "garmentImageUrl": "https://example.com/bottom-01.jpg", "category": "BOTTOM" },
+    { "caseId": "bottom-02", "personImageUrl": "https://example.com/person-06.jpg", "garmentImageUrl": "https://example.com/bottom-02.jpg", "category": "BOTTOM" },
+    { "caseId": "bottom-03", "personImageUrl": "https://example.com/person-07.jpg", "garmentImageUrl": "https://example.com/bottom-03.jpg", "category": "BOTTOM" },
+    { "caseId": "bottom-04", "personImageUrl": "https://example.com/person-08.jpg", "garmentImageUrl": "https://example.com/bottom-04.jpg", "category": "BOTTOM" },
+    { "caseId": "dress-01", "personImageUrl": "https://example.com/person-09.jpg", "garmentImageUrl": "https://example.com/dress-01.jpg", "category": "DRESS" },
+    { "caseId": "dress-02", "personImageUrl": "https://example.com/person-10.jpg", "garmentImageUrl": "https://example.com/dress-02.jpg", "category": "DRESS" }
+  ]
+}
