@@ -1,4 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { DiagnosisProgress } from "./diagnosis-progress";
 import { PhotoUploadCard } from "./photo-upload-card";
@@ -24,5 +26,35 @@ describe("diagnosis workspace", () => {
     expect(html).toContain('aria-label="Upload Front face"');
     expect(html).toContain("aspect-[4/5]");
     expect(html).toContain("Clear, well-lit front face");
+  });
+
+  it("requires an approved total-outfit budget in the submitted payload", () => {
+    const source = readFileSync(resolve("src/app/diagnosis/page.tsx"), "utf8");
+
+    for (const label of [
+      "500 元以内",
+      "500–1000 元",
+      "1000–2000 元",
+      "2000 元以上",
+    ]) {
+      expect(source).toContain(label);
+    }
+    expect(source).toContain("budgetTier: form.budgetTier");
+    expect(source).toMatch(/canSubmit[\s\S]*form\.budgetTier/);
+  });
+
+  it("connects consent and per-recommendation try-on requests in sequence", () => {
+    const source = readFileSync(resolve("src/app/diagnosis/[id]/page.tsx"), "utf8");
+
+    expect(source).toContain("/try-on-consent");
+    expect(source).toContain("JSON.stringify({ consent: true, deleteGenerated: false })");
+    expect(source).toContain("/recommendations/${recommendationId}/try-on");
+    const consentIndex = source.indexOf("const consentResponse");
+    const refreshIndex = source.indexOf("await fetchDiagnosis();", consentIndex);
+    const requestIndex = source.indexOf("/recommendations/${recommendationId}/try-on", consentIndex);
+    expect(consentIndex).toBeGreaterThan(-1);
+    expect(refreshIndex).toBeGreaterThan(consentIndex);
+    expect(requestIndex).toBeGreaterThan(refreshIndex);
+    expect(source).toContain("onGenerateTryOn={() => void requestTryOn(recommendation.id)}");
   });
 });

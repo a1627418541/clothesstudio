@@ -12,6 +12,12 @@ export interface DiagnosisDetail {
   age: number;
   heightCm: number;
   weightKg: number;
+  budgetTier:
+    | "UNDER_500"
+    | "FROM_500_TO_1000"
+    | "FROM_1000_TO_2000"
+    | "ABOVE_2000";
+  faceTryOnConsent: boolean;
   status: string;
   bodyType: string | null;
   faceShape: string | null;
@@ -51,6 +57,7 @@ export async function getDiagnosisDetailForViewer({
       },
       recommendations: {
         orderBy: { rank: "asc" },
+        include: { products: { orderBy: { position: "asc" } } },
       },
     },
   });
@@ -104,6 +111,17 @@ export async function getDiagnosisDetailForViewer({
       tryOnImageUrl: rec.tryOnImageUrl,
       tryOnImageStatus: rec.tryOnImageStatus,
       tryOnImageError: rec.tryOnImageError,
+      marketplacePlatform: rec.marketplacePlatform,
+      productTotalCents: rec.productTotalCents,
+      productPlanStatus: rec.productPlanStatus,
+      products: rec.products,
+      tryOnWorkflowStatus: rec.tryOnWorkflowStatus,
+      tryOnAttemptCount: rec.tryOnAttemptCount,
+      tryOnProvider: rec.tryOnProvider,
+      identityScore: rec.identityScore,
+      productFidelityScore: rec.productFidelityScore,
+      tryOnExpiresAt: rec.tryOnExpiresAt,
+      tryOnProductSnapshotHash: rec.tryOnProductSnapshotHash,
       archetype: null,
     }));
 
@@ -144,6 +162,9 @@ export async function getDiagnosisDetailForViewer({
     age: diagnosis.age,
     heightCm: diagnosis.heightCm,
     weightKg: diagnosis.weightKg,
+    budgetTier: diagnosis.budgetTier,
+    faceTryOnConsent:
+      diagnosis.faceTryOnConsent && !diagnosis.faceTryOnRevokedAt,
     status: diagnosis.status,
     bodyType: diagnosis.bodyType,
     faceShape: diagnosis.faceShape,

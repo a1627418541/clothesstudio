@@ -1,10 +1,15 @@
 import {
   AiJobStatus,
   AiJobType,
+  BudgetTier,
   ImageStatus,
   MacroCategory,
+  MarketplacePlatform,
+  MarketplaceProductCategory,
   Prisma,
+  ProductPlanStatus,
   RecommendationSource,
+  TryOnWorkflowStatus,
 } from "@prisma/client";
 import { describe, expect, expectTypeOf, it } from "vitest";
 
@@ -87,6 +92,44 @@ describe("Sprint 3.8 current Prisma contracts", () => {
       "SPORT_ACTIVE",
       "TREND_YOUTH",
     ]);
+  });
+
+  it("defines marketplace and mock try-on contracts", () => {
+    expect(Object.values(BudgetTier)).toEqual([
+      "UNDER_500",
+      "FROM_500_TO_1000",
+      "FROM_1000_TO_2000",
+      "ABOVE_2000",
+    ]);
+    expect(Object.values(MarketplacePlatform)).toEqual(["TAOBAO", "JD"]);
+    expect(Object.values(MarketplaceProductCategory)).toEqual([
+      "TOP",
+      "BOTTOM",
+      "OUTERWEAR",
+      "HAT",
+    ]);
+    expect(Object.values(ProductPlanStatus)).toEqual([
+      "PENDING",
+      "READY",
+      "FAILED",
+      "STALE",
+    ]);
+    expect(Object.values(TryOnWorkflowStatus)).toContain("QUALITY_CHECKING");
+    expect(
+      getModel("RecommendationProduct").fields.map((field) => field.name)
+    ).toEqual(
+      expect.arrayContaining([
+        "recommendationId",
+        "platform",
+        "externalProductId",
+        "externalSkuId",
+        "category",
+        "imageUrl",
+        "purchaseUrl",
+        "priceCents",
+        "snapshotAt",
+      ])
+    );
   });
 
   it("adds only the approved V2 recommendation fields", () => {

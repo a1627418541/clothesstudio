@@ -25,6 +25,25 @@ function snapshotFor(index: number) {
   });
 }
 
+const marketplaceProducts = ["TOP", "BOTTOM", "OUTERWEAR", "HAT"].map(
+  (category, index) => ({
+    id: `product-${index + 1}`,
+    platform: "TAOBAO" as const,
+    category: category as "TOP" | "BOTTOM" | "OUTERWEAR" | "HAT",
+    title: `${category} product`,
+    imageUrl: `https://assets.example/${category.toLowerCase()}.jpg`,
+    purchaseUrl: `https://example.invalid/product/${index + 1}`,
+    priceCents: 10_000 + index * 1_000,
+    currency: "CNY",
+    sellerName: "Mock seller",
+    color: "brown",
+    variantLabel: "Brown / M",
+    isOptional: category === "OUTERWEAR",
+    availabilityStatus: "AVAILABLE" as const,
+    snapshotAt: new Date("2026-07-20T00:00:00.000Z"),
+  })
+);
+
 function v2Record(index: number, overrides: Record<string, unknown> = {}) {
   const snapshot = snapshotFor(index);
   return {
@@ -60,6 +79,17 @@ function v2Record(index: number, overrides: Record<string, unknown> = {}) {
     tryOnImageUrl: null,
     tryOnImageStatus: "PENDING",
     tryOnImageError: null,
+    marketplacePlatform: "TAOBAO",
+    productTotalCents: 88_600,
+    productPlanStatus: "READY",
+    products: marketplaceProducts,
+    tryOnWorkflowStatus: "COMPLETED",
+    tryOnAttemptCount: 1,
+    tryOnProvider: "mock",
+    identityScore: 0.96,
+    productFidelityScore: 0.94,
+    tryOnExpiresAt: new Date("2026-08-19T00:00:00.000Z"),
+    tryOnProductSnapshotHash: "sha256:products",
     archetype: {
       id: "live-mutated",
       name: "LIVE MUTATED NAME",
@@ -104,6 +134,17 @@ function legacyRecord(index: number, overrides: Record<string, unknown> = {}) {
     tryOnImageUrl: null,
     tryOnImageStatus: "PENDING",
     tryOnImageError: null,
+    marketplacePlatform: null,
+    productTotalCents: null,
+    productPlanStatus: "PENDING",
+    products: [],
+    tryOnWorkflowStatus: "NOT_REQUESTED",
+    tryOnAttemptCount: 0,
+    tryOnProvider: null,
+    identityScore: null,
+    productFidelityScore: null,
+    tryOnExpiresAt: null,
+    tryOnProductSnapshotHash: null,
     archetype:
       index === 0
         ? {
@@ -160,6 +201,19 @@ describe("snapshot-authoritative report display model", () => {
       snapshot.styleDNA.avoidDNA,
       ...snapshot.styleDNA.forbiddenItems,
     ]);
+    expect(primary).toMatchObject({
+      marketplacePlatform: "TAOBAO",
+      productTotalCents: 88_600,
+      productPlanStatus: "READY",
+      tryOnWorkflowStatus: "COMPLETED",
+    });
+    expect(primary.products.map((product) => product.category)).toEqual([
+      "TOP",
+      "BOTTOM",
+      "OUTERWEAR",
+      "HAT",
+    ]);
+    expect(primary.products[0].snapshotAt).toBe("2026-07-20T00:00:00.000Z");
     expect(JSON.stringify(primary)).not.toContain("MUTATED");
   });
 

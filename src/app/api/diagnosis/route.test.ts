@@ -7,9 +7,17 @@ const mocks = vi.hoisted(() => ({
   getAnonymousSessionByToken: vi.fn(),
   findAssets: vi.fn(),
   findArchetypes: vi.fn(),
+  findRecommendations: vi.fn(),
+  markProductPlansFailed: vi.fn(),
+  markTryOnFailed: vi.fn(),
+  styleDiagnosisCreate: vi.fn(),
   transaction: vi.fn(),
   analyze: vi.fn(),
   finalizeJob: vi.fn(),
+  matchOutfitProductPlans: vi.fn(),
+  hashProductSnapshots: vi.fn(),
+  persistRecommendationProductPlans: vi.fn(),
+  runTryOnWorkflow: vi.fn(),
 }));
 
 vi.mock("@/lib/auth", () => ({ auth: mocks.auth }));
@@ -20,8 +28,23 @@ vi.mock("@/lib/prisma", () => ({
   prisma: {
     mediaAsset: { findMany: mocks.findAssets },
     styleArchetype: { findMany: mocks.findArchetypes },
+    styleRecommendation: {
+      findMany: mocks.findRecommendations,
+      updateMany: mocks.markProductPlansFailed,
+      update: mocks.markTryOnFailed,
+    },
     $transaction: mocks.transaction,
   },
+}));
+vi.mock("@/lib/marketplace/outfit-product-matcher", () => ({
+  matchOutfitProductPlans: mocks.matchOutfitProductPlans,
+}));
+vi.mock("@/lib/marketplace/recommendation-product-service", () => ({
+  hashProductSnapshots: mocks.hashProductSnapshots,
+  persistRecommendationProductPlans: mocks.persistRecommendationProductPlans,
+}));
+vi.mock("@/lib/try-on/prisma-try-on-workflow", () => ({
+  runTryOnWorkflow: mocks.runTryOnWorkflow,
 }));
 vi.mock("@/lib/ai/style-ai-service", () => ({
   StyleAiService: class {
@@ -122,6 +145,7 @@ const requestBody = {
   age: 30,
   heightCm: 178,
   weightKg: 74,
+  budgetTier: "FROM_500_TO_1000",
   faceTryOnConsent: false,
   photoAssetIds: {
     FACE_FRONT: "asset-front",
@@ -130,11 +154,11 @@ const requestBody = {
   },
 };
 
-function makeRequest(): NextRequest {
+function makeRequest(body: typeof requestBody = requestBody): NextRequest {
   return new NextRequest("http://localhost/api/diagnosis", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify(requestBody),
+    body: JSON.stringify(body),
   });
 }
 
@@ -163,10 +187,37 @@ describe("POST /api/diagnosis Archetype V2 integration", () => {
       errorMessage: null,
     });
     mocks.finalizeJob.mockResolvedValue(undefined);
+    mocks.styleDiagnosisCreate.mockResolvedValue(diagnosis);
+    mocks.findRecommendations.mockResolvedValue(
+      [1, 2, 3].map((rank) => ({
+        id: `rec-${rank}`,
+        rank,
+        isPrimary: rank === 1,
+        title: `Direction ${rank}`,
+        colorPalette: ["brown", "cream"],
+        items: [{ category: "top" }, { category: "bottom" }, { category: "hat" }],
+      }))
+    );
+    mocks.matchOutfitProductPlans.mockResolvedValue(
+      [1, 2, 3].map((rank) => ({
+        rank,
+        platform: "TAOBAO",
+        products: [],
+        totalCents: 80_000,
+      }))
+    );
+    mocks.persistRecommendationProductPlans.mockResolvedValue(undefined);
+    mocks.hashProductSnapshots.mockReturnValue("sha256:products");
+    mocks.markProductPlansFailed.mockResolvedValue({ count: 3 });
+    mocks.markTryOnFailed.mockResolvedValue({});
+    mocks.runTryOnWorkflow.mockResolvedValue({
+      status: "COMPLETED",
+      attemptNumber: 1,
+    });
 
     const tx = {
       styleDiagnosis: {
-        create: vi.fn().mockResolvedValue(diagnosis),
+        create: mocks.styleDiagnosisCreate,
         update: vi.fn().mockResolvedValue({
           ...diagnosis,
           status: "PREVIEW_READY",
@@ -227,6 +278,77 @@ describe("POST /api/diagnosis Archetype V2 integration", () => {
     expect(
       createdRecommendations.every((row) => row.sourceMode === "LEGACY_AI")
     ).toBe(true);
+  });
+
+  it("persists the budget and attaches three marketplace product plans", async () => {
+    const response = await POST(makeRequest());
+
+    expect(response.status).toBe(201);
+    expect(mocks.styleDiagnosisCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        budgetTier: "FROM_500_TO_1000",
+      }),
+    });
+    expect(mocks.matchOutfitProductPlans).toHaveBeenCalledOnce();
+    expect(mocks.persistRecommendationProductPlans).toHaveBeenCalledOnce();
+  });
+
+  it("keeps the diagnosis successful when marketplace planning fails", async () => {
+    mocks.matchOutfitProductPlans.mockRejectedValueOnce(
+      new Error("NO_COMPLETE_SINGLE_PLATFORM_PLAN")
+    );
+
+    const response = await POST(makeRequest());
+
+    expect(response.status).toBe(201);
+    expect(mocks.persistRecommendationProductPlans).not.toHaveBeenCalled();
+    expect(mocks.markProductPlansFailed).toHaveBeenCalledWith({
+      where: { id: { in: ["rec-1", "rec-2", "rec-3"] } },
+      data: { productPlanStatus: "FAILED" },
+    });
+  });
+
+  it("auto-generates only the authorized primary recommendation", async () => {
+    const response = await POST(
+      makeRequest({ ...requestBody, faceTryOnConsent: true })
+    );
+
+    expect(response.status).toBe(201);
+    expect(mocks.runTryOnWorkflow).toHaveBeenCalledOnce();
+    expect(mocks.runTryOnWorkflow).toHaveBeenCalledWith(
+      expect.objectContaining({
+        diagnosisId: "diagnosis-1",
+        recommendationId: "rec-1",
+        trigger: "AUTO_PRIMARY",
+        isPrimary: true,
+        expectedStatuses: ["NOT_REQUESTED"],
+      })
+    );
+  });
+
+  it("does not auto-generate without consent", async () => {
+    const response = await POST(makeRequest());
+
+    expect(response.status).toBe(201);
+    expect(mocks.runTryOnWorkflow).not.toHaveBeenCalled();
+  });
+
+  it("keeps diagnosis creation successful when automatic try-on fails", async () => {
+    mocks.runTryOnWorkflow.mockRejectedValueOnce(new Error("provider secret"));
+
+    const response = await POST(
+      makeRequest({ ...requestBody, faceTryOnConsent: true })
+    );
+
+    expect(response.status).toBe(201);
+    expect(mocks.markTryOnFailed).toHaveBeenCalledWith({
+      where: { id: "rec-1" },
+      data: {
+        tryOnImageStatus: "FAILED",
+        tryOnWorkflowStatus: "FAILED",
+        tryOnFailureCode: "AUTO_TRY_ON_FAILED",
+      },
+    });
   });
 
   it("writes three immutable V2 snapshots when the flag and candidates are ready", async () => {

@@ -1,17 +1,27 @@
 import { EditorialLabel } from "@/components/ui/editorial-label";
 import { ReportRecommendation } from "@/types/diagnosis";
 import { ColorPalette } from "./color-palette";
+import { MarketplaceProductGrid } from "./marketplace-product-grid";
 import { RecommendationItems } from "./recommendation-items";
 import { RecommendationMeta } from "./recommendation-meta";
 import { StylePreviewImage } from "./style-preview-image";
+import { TryOnStatusPanel } from "./try-on-status-panel";
+
+interface AlternativeStyleCardProps {
+  recommendation: ReportRecommendation;
+  rank: number;
+  faceTryOnConsent?: boolean;
+  isGeneratingTryOn?: boolean;
+  onGenerateTryOn?: () => void;
+}
 
 export function AlternativeStyleCard({
   recommendation,
   rank,
-}: {
-  recommendation: ReportRecommendation;
-  rank: number;
-}) {
+  faceTryOnConsent = false,
+  isGeneratingTryOn = false,
+  onGenerateTryOn = () => undefined,
+}: AlternativeStyleCardProps) {
   const directionNumber = String(rank + 1).padStart(2, "0");
 
   return (
@@ -28,9 +38,16 @@ export function AlternativeStyleCard({
           aspect="3/4"
           disclosure={
             recommendation.tryOnImageUrl
-              ? "AI 生成效果图，仅供参考"
+              ? "本人试穿为 AI 生成效果，仅供搭配参考"
               : null
           }
+        />
+        <TryOnStatusPanel
+          recommendation={recommendation}
+          faceTryOnConsent={faceTryOnConsent}
+          isPrimary={false}
+          isGenerating={isGeneratingTryOn}
+          onGenerate={onGenerateTryOn}
         />
       </div>
       <div className="p-7">
@@ -55,6 +72,7 @@ export function AlternativeStyleCard({
             </div>
           </div>
         ) : null}
+        <MarketplaceProductGrid recommendation={recommendation} />
         {recommendation.avoidTips.length > 0 ? (
           <p className="mt-5 border-l-2 border-[var(--oxblood)] pl-3 text-xs leading-5 text-[var(--muted-ink)]">
             Avoid: {recommendation.avoidTips.slice(0, 2).join(" · ")}

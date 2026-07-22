@@ -11,6 +11,12 @@ export const diagnosisFormSchema = z.object({
   age: z.number().int().min(13).max(80),
   heightCm: z.number().int().min(120).max(230),
   weightKg: z.number().int().min(30).max(200),
+  budgetTier: z.enum([
+    "UNDER_500",
+    "FROM_500_TO_1000",
+    "FROM_1000_TO_2000",
+    "ABOVE_2000",
+  ]),
   photoAssetIds: diagnosisPhotoAssetIdsSchema,
   faceTryOnConsent: z.boolean().default(false),
 });

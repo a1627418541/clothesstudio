@@ -1,4 +1,8 @@
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import {
+  DeleteObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
 
 export function getR2Client(): S3Client {
   const accountId = process.env.CLOUDFLARE_R2_ACCOUNT_ID;
@@ -82,4 +86,16 @@ export async function uploadBufferToR2(params: {
     key: params.key,
     url,
   };
+}
+
+export async function deleteObjectFromR2(input: {
+  bucket: string;
+  key: string;
+}): Promise<void> {
+  await getR2Client().send(
+    new DeleteObjectCommand({
+      Bucket: input.bucket,
+      Key: input.key,
+    })
+  );
 }

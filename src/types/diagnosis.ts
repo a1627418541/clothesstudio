@@ -8,6 +8,45 @@ export interface ReportArchetypeMetadata {
   category: string;
 }
 
+export interface ReportMarketplaceProduct {
+  id: string;
+  platform: "TAOBAO" | "JD";
+  category: "TOP" | "BOTTOM" | "OUTERWEAR" | "HAT";
+  title: string;
+  imageUrl: string;
+  purchaseUrl: string;
+  priceCents: number;
+  currency: string;
+  sellerName: string;
+  color: string;
+  variantLabel: string;
+  isOptional: boolean;
+  availabilityStatus: "AVAILABLE" | "UNAVAILABLE" | "UNKNOWN";
+  snapshotAt: string;
+}
+
+export type ReportTryOnWorkflowStatus =
+  | "NOT_REQUESTED"
+  | "QUEUED"
+  | "APPLYING_GARMENTS"
+  | "APPLYING_HAT"
+  | "RESTORING_IDENTITY"
+  | "QUALITY_CHECKING"
+  | "COMPLETED"
+  | "FAILED"
+  | "CANCELLED"
+  | "EXPIRED";
+
+export interface ReportTryOnState {
+  tryOnWorkflowStatus: ReportTryOnWorkflowStatus;
+  tryOnAttemptCount: number;
+  tryOnProvider: string | null;
+  identityScore: number | null;
+  productFidelityScore: number | null;
+  tryOnExpiresAt: string | null;
+  tryOnProductSnapshotHash: string | null;
+}
+
 interface BaseReportRecommendation {
   id: string;
   rank: number;
@@ -28,6 +67,17 @@ interface BaseReportRecommendation {
   tryOnImageUrl: string | null;
   tryOnImageStatus: string;
   tryOnImageError: string | null;
+  products: ReportMarketplaceProduct[];
+  marketplacePlatform: "TAOBAO" | "JD" | null;
+  productTotalCents: number | null;
+  productPlanStatus: "PENDING" | "READY" | "FAILED" | "STALE";
+  tryOnWorkflowStatus: ReportTryOnWorkflowStatus;
+  tryOnAttemptCount: number;
+  tryOnProvider: string | null;
+  identityScore: number | null;
+  productFidelityScore: number | null;
+  tryOnExpiresAt: string | null;
+  tryOnProductSnapshotHash: string | null;
   archetype: ReportArchetypeMetadata | null;
   matchScore: number | null;
   personalityLabel: string | null;

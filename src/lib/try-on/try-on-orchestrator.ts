@@ -1,0 +1,181 @@
+import type {
+  RunTryOnWorkflowInput,
+  TryOnGarmentCategory,
+  TryOnWorkflowDependencies,
+  TryOnWorkflowResult,
+} from "./types";
+
+const ALLOWED_CLAIM_STATUSES = new Set(["NOT_REQUESTED", "FAILED"]);
+const GARMENT_ORDER: TryOnGarmentCategory[] = [
+  "TOP",
+  "BOTTOM",
+  "OUTERWEAR",
+];
+const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1_000;
+
+function hasCompleteRequiredProducts(input: RunTryOnWorkflowInput): boolean {
+  const categories = new Set(input.products.map((product) => product.category));
+  return ["TOP", "BOTTOM", "HAT"].every((category) =>
+    categories.has(category as "TOP" | "BOTTOM" | "HAT")
+  );
+}
+
+function expiresAtFor(input: RunTryOnWorkflowInput): Date | null {
+  if (!input.isAnonymous || !input.diagnosisCreatedAt) return null;
+  return new Date(input.diagnosisCreatedAt.getTime() + THIRTY_DAYS_MS);
+}
+
+async function cancelWorkflow(
+  input: RunTryOnWorkflowInput,
+  dependencies: TryOnWorkflowDependencies,
+  reason: "CONSENT_REQUIRED" | "CONSENT_REVOKED"
+): Promise<TryOnWorkflowResult> {
+  await dependencies.persistence.persistCancelled({
+    recommendationId: input.recommendationId,
+    reason,
+  });
+  return { status: "CANCELLED", reason };
+}
+
+export async function runTryOnWorkflow(
+  input: RunTryOnWorkflowInput,
+  dependencies: TryOnWorkflowDependencies
+): Promise<TryOnWorkflowResult> {
+  if (input.trigger === "AUTO_PRIMARY" && !input.isPrimary) {
+    return { status: "SKIPPED", reason: "AUTO_PRIMARY_ONLY" };
+  }
+  if (!input.consent) {
+    return cancelWorkflow(input, dependencies, "CONSENT_REQUIRED");
+  }
+  if (!hasCompleteRequiredProducts(input)) {
+    return { status: "SKIPPED", reason: "INCOMPLETE_PRODUCT_PLAN" };
+  }
+  if (
+    input.expectedStatuses.length === 0 ||
+    input.expectedStatuses.some((status) => !ALLOWED_CLAIM_STATUSES.has(status))
+  ) {
+    return { status: "SKIPPED", reason: "INVALID_EXPECTED_STATUS" };
+  }
+
+  const currentConsent = await dependencies.persistence.readConsent(
+    input.diagnosisId
+  );
+  if (!currentConsent) {
+    return cancelWorkflow(input, dependencies, "CONSENT_REQUIRED");
+  }
+
+  const claim = await dependencies.persistence.claimAttempt({
+    recommendationId: input.recommendationId,
+    expectedStatuses: input.expectedStatuses,
+    productSnapshotHash: input.productSnapshotHash,
+  });
+  if (!claim.claimed) {
+    return { status: "SKIPPED", reason: "NOT_CLAIMED" };
+  }
+  if (
+    claim.productSnapshotHash !== undefined &&
+    claim.productSnapshotHash !== input.productSnapshotHash
+  ) {
+    return { status: "SKIPPED", reason: "SNAPSHOT_MISMATCH" };
+  }
+
+  const consentAfterClaim = await dependencies.persistence.readConsent(
+    input.diagnosisId
+  );
+  if (!consentAfterClaim) {
+    return cancelWorkflow(input, dependencies, "CONSENT_REVOKED");
+  }
+
+  const garmentProducts = input.products
+    .filter(
+      (product): product is typeof product & { category: TryOnGarmentCategory } =>
+        product.category !== "HAT"
+    )
+    .sort(
+      (left, right) =>
+        GARMENT_ORDER.indexOf(left.category) -
+        GARMENT_ORDER.indexOf(right.category)
+    );
+  const hat = input.products.find((product) => product.category === "HAT")!;
+  const productImageUrls = [...garmentProducts, hat].map(
+    (product) => product.imageUrl
+  );
+
+  for (let compositionAttempt = 1; compositionAttempt <= 2; compositionAttempt += 1) {
+    try {
+      let composedImageUrl = input.fullBodyImageUrl;
+      for (const product of garmentProducts) {
+        await dependencies.persistence.setStatus(
+          input.recommendationId,
+          "APPLYING_GARMENTS"
+        );
+        const result = await dependencies.virtualTryOn.applyGarment({
+          personImageUrl: composedImageUrl,
+          productImageUrl: product.imageUrl,
+          category: product.category,
+        });
+        composedImageUrl = result.imageUrl;
+      }
+
+      await dependencies.persistence.setStatus(
+        input.recommendationId,
+        "APPLYING_HAT"
+      );
+      const hatResult = await dependencies.virtualTryOn.applyHat({
+        personImageUrl: composedImageUrl,
+        productImageUrl: hat.imageUrl,
+      });
+      composedImageUrl = hatResult.imageUrl;
+
+      const consentBeforeIdentity = await dependencies.persistence.readConsent(
+        input.diagnosisId
+      );
+      if (!consentBeforeIdentity) {
+        return cancelWorkflow(input, dependencies, "CONSENT_REVOKED");
+      }
+
+      await dependencies.persistence.setStatus(
+        input.recommendationId,
+        "RESTORING_IDENTITY"
+      );
+      const restored = await dependencies.identityRestore.restore({
+        composedImageUrl,
+        faceImageUrl: input.faceImageUrl,
+      });
+
+      await dependencies.persistence.setStatus(
+        input.recommendationId,
+        "QUALITY_CHECKING"
+      );
+      const quality = await dependencies.quality.evaluate({
+        imageUrl: restored.imageUrl,
+        faceImageUrl: input.faceImageUrl,
+        productImageUrls,
+      });
+      if (!quality.passed) continue;
+
+      await dependencies.persistence.persistCompleted({
+        recommendationId: input.recommendationId,
+        imageUrl: restored.imageUrl,
+        identityScore: quality.identityScore,
+        productFidelityScore: quality.productFidelityScore,
+        providerName: dependencies.virtualTryOn.name,
+        tryOnExpiresAt: expiresAtFor(input),
+      });
+      return { status: "COMPLETED", attemptNumber: claim.attemptNumber };
+    } catch {
+      if (compositionAttempt < 2) continue;
+      await dependencies.persistence.persistFailed({
+        recommendationId: input.recommendationId,
+        failureCode: "PROVIDER_FAILED",
+      });
+      return { status: "FAILED", reason: "PROVIDER_FAILED" };
+    }
+  }
+
+  await dependencies.persistence.persistFailed({
+    recommendationId: input.recommendationId,
+    failureCode: "QUALITY_CHECK_FAILED",
+  });
+  return { status: "FAILED", reason: "QUALITY_CHECK_FAILED" };
+}

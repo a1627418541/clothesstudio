@@ -38,7 +38,7 @@ describe("editorial report components", () => {
       <StylePreviewImage status="FAILED" url={null} title="Old Money" />
     );
 
-    expect(html).toContain("Style preview unavailable");
+    expect(html).toContain("搭配图片暂不可用");
     expect(html).toContain("aspect-[4/5]");
   });
 

@@ -10,6 +10,28 @@ import {
   buildRecommendationPlan,
 } from "@/lib/style-archetype/recommendation-plan";
 import { persistRecommendationPlan } from "@/lib/style-archetype/recommendation-persistence";
+import { createMockProductProvider } from "@/lib/marketplace/mock-product-provider";
+import { matchOutfitProductPlans } from "@/lib/marketplace/outfit-product-matcher";
+import {
+  hashProductSnapshots,
+  persistRecommendationProductPlans,
+} from "@/lib/marketplace/recommendation-product-service";
+import { runTryOnWorkflow } from "@/lib/try-on/prisma-try-on-workflow";
+
+function requiredItemNames(items: unknown): string[] {
+  if (!Array.isArray(items)) return [];
+  return items.flatMap((item) => {
+    if (
+      typeof item === "object" &&
+      item !== null &&
+      "category" in item &&
+      typeof item.category === "string"
+    ) {
+      return [item.category];
+    }
+    return [];
+  });
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -39,7 +61,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { gender, age, heightCm, weightKg, photoAssetIds, faceTryOnConsent } = parsed.data;
+    const {
+      gender,
+      age,
+      heightCm,
+      weightKg,
+      budgetTier,
+      photoAssetIds,
+      faceTryOnConsent,
+    } = parsed.data;
 
     const assetIds = Object.values(photoAssetIds);
     const assets = await prisma.mediaAsset.findMany({
@@ -85,6 +115,7 @@ export async function POST(request: NextRequest) {
           age,
           heightCm,
           weightKg,
+          budgetTier,
           status: "SUBMITTED",
           faceTryOnConsent,
           faceTryOnConsentAt: faceTryOnConsent ? new Date() : null,
@@ -163,6 +194,99 @@ export async function POST(request: NextRequest) {
         console.error("Failed to finalize AI job after persistence failure:", finalizeError);
       }
       throw error;
+    }
+
+    const savedRecommendations = await prisma.styleRecommendation.findMany({
+      where: { diagnosisId: diagnosis.id },
+      orderBy: { rank: "asc" },
+      select: {
+        id: true,
+        rank: true,
+        isPrimary: true,
+        title: true,
+        colorPalette: true,
+        items: true,
+      },
+    });
+    let productPlans: Awaited<
+      ReturnType<typeof matchOutfitProductPlans>
+    > | null = null;
+    try {
+      productPlans = await matchOutfitProductPlans({
+        budgetTier,
+        providers: [
+          createMockProductProvider("TAOBAO"),
+          createMockProductProvider("JD"),
+        ],
+        recommendations: savedRecommendations.map((recommendation) => ({
+          rank: recommendation.rank,
+          title: recommendation.title,
+          colorPalette: recommendation.colorPalette,
+          requiredItems: requiredItemNames(recommendation.items),
+        })),
+      });
+      await persistRecommendationProductPlans({
+        client: prisma,
+        recommendations: savedRecommendations.map(({ id, rank }) => ({
+          id,
+          rank,
+        })),
+        plans: productPlans,
+      });
+    } catch {
+      await prisma.styleRecommendation.updateMany({
+        where: { id: { in: savedRecommendations.map(({ id }) => id) } },
+        data: { productPlanStatus: "FAILED" },
+      });
+    }
+
+    if (faceTryOnConsent && productPlans) {
+      const primary = savedRecommendations.find(
+        (recommendation) => recommendation.isPrimary
+      );
+      const primaryPlan = primary
+        ? productPlans.find((plan) => plan.rank === primary.rank)
+        : null;
+      if (primary && primaryPlan) {
+        const productSnapshotHash = hashProductSnapshots(
+          primaryPlan.products.map((product, index) => ({
+            ...product,
+            position: index + 1,
+          }))
+        );
+        try {
+          await runTryOnWorkflow({
+            diagnosisId: diagnosis.id,
+            recommendationId: primary.id,
+            trigger: "AUTO_PRIMARY",
+            isPrimary: true,
+            expectedStatuses: ["NOT_REQUESTED"],
+            consent: true,
+            fullBodyImageUrl: roleUrlMap.FULL_BODY,
+            faceImageUrl: roleUrlMap.FACE_FRONT,
+            productSnapshotHash,
+            products: primaryPlan.products.map((product) => ({
+              category: product.category,
+              imageUrl: product.imageUrl,
+            })),
+            diagnosisCreatedAt: diagnosis.createdAt,
+            isAnonymous: !diagnosis.userId,
+          });
+        } catch {
+          try {
+            await prisma.styleRecommendation.update({
+              where: { id: primary.id },
+              data: {
+                tryOnImageStatus: "FAILED",
+                tryOnWorkflowStatus: "FAILED",
+                tryOnFailureCode: "AUTO_TRY_ON_FAILED",
+              },
+            });
+          } catch {
+            // Diagnosis creation remains successful even if failure recording fails.
+          }
+        }
+      }
     }
 
     try {

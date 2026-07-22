@@ -24,6 +24,8 @@ interface DiagnosisDetail {
   age: number;
   heightCm: number;
   weightKg: number;
+  budgetTier: string;
+  faceTryOnConsent: boolean;
   status: string;
   bodyType: string | null;
   faceShape: string | null;
@@ -59,6 +61,8 @@ export default function DiagnosisDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [isGeneratingPreviews, setIsGeneratingPreviews] = useState(false);
   const [previewGenerationError, setPreviewGenerationError] = useState<string | null>(null);
+  const [generatingTryOnId, setGeneratingTryOnId] = useState<string | null>(null);
+  const [tryOnRequestError, setTryOnRequestError] = useState<string | null>(null);
 
   const fetchDiagnosis = useCallback(async () => {
     try {
@@ -112,6 +116,42 @@ export default function DiagnosisDetailPage() {
     void requestStylePreviews(false);
   }, [diagnosis, isGeneratingPreviews, requestStylePreviews]);
 
+  const requestTryOn = useCallback(
+    async (recommendationId: string, authorizeFirst = false) => {
+      if (generatingTryOnId) return;
+      setGeneratingTryOnId(recommendationId);
+      setTryOnRequestError(null);
+
+      try {
+        if (authorizeFirst) {
+          const consentResponse = await fetch(`/api/diagnosis/${id}/try-on-consent`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ consent: true, deleteGenerated: false }),
+          });
+          if (!consentResponse.ok) {
+            throw new Error("CONSENT_UPDATE_FAILED");
+          }
+          await fetchDiagnosis();
+        }
+
+        const response = await fetch(
+          `/api/diagnosis/${id}/recommendations/${recommendationId}/try-on`,
+          { method: "POST" }
+        );
+        if (!response.ok) {
+          throw new Error("TRY_ON_REQUEST_FAILED");
+        }
+        await fetchDiagnosis();
+      } catch {
+        setTryOnRequestError("本人试穿暂时无法生成，请稍后重试。");
+      } finally {
+        setGeneratingTryOnId(null);
+      }
+    },
+    [fetchDiagnosis, generatingTryOnId, id]
+  );
+
   if (loading) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center bg-[var(--paper)]" role="status">
@@ -161,7 +201,19 @@ export default function DiagnosisDetailPage() {
         />
 
         {primaryRecommendation ? (
-          <PrimaryStyleDirection recommendation={primaryRecommendation} />
+          <PrimaryStyleDirection
+            recommendation={primaryRecommendation}
+            faceTryOnConsent={diagnosis.faceTryOnConsent}
+            isGeneratingTryOn={generatingTryOnId === primaryRecommendation.id}
+            onGenerateTryOn={() => void requestTryOn(primaryRecommendation.id)}
+            onAuthorizeAndGenerate={() => void requestTryOn(primaryRecommendation.id, true)}
+          />
+        ) : null}
+
+        {tryOnRequestError ? (
+          <p className="-mt-8 mb-12 text-center text-sm text-[var(--error)]" role="alert">
+            {tryOnRequestError}
+          </p>
         ) : null}
 
         {alternatives.length > 0 ? (
@@ -181,6 +233,9 @@ export default function DiagnosisDetailPage() {
                   key={recommendation.id}
                   recommendation={recommendation}
                   rank={index + 1}
+                  faceTryOnConsent={diagnosis.faceTryOnConsent}
+                  isGeneratingTryOn={generatingTryOnId === recommendation.id}
+                  onGenerateTryOn={() => void requestTryOn(recommendation.id)}
                 />
               ))}
             </div>
