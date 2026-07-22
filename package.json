@@ -31,6 +31,7 @@
     "prisma": "^7.8.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "tencentcloud-sdk-nodejs-aiart": "^4.1.218",
     "ws": "^8.21.0",
     "zod": "^4.4.3"
   },
