@@ -49,9 +49,9 @@ function makeDependencies() {
         productSnapshotHash: "sha256:products",
       })),
       readConsent: vi.fn(async () => true),
-      setStatus: vi.fn(async () => undefined),
-      persistCompleted: vi.fn(async () => undefined),
-      persistFailed: vi.fn(async () => undefined),
+      setStatus: vi.fn(async () => true),
+      persistCompleted: vi.fn(async () => true),
+      persistFailed: vi.fn(async () => true),
       persistCancelled: vi.fn(async () => undefined),
     },
   };
@@ -195,6 +195,54 @@ describe("runTryOnWorkflow", () => {
     expect(deps.virtualTryOn.applyGarment).not.toHaveBeenCalled();
     expect(deps.identityRestore.restore).not.toHaveBeenCalled();
     expect(deps.quality.evaluate).not.toHaveBeenCalled();
+  });
+
+  it("does not send face data to quality after consent is revoked", async () => {
+    deps.persistence.readConsent
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false);
+
+    const result = await runTryOnWorkflow(makeInput(), deps);
+
+    expect(result).toEqual({
+      status: "CANCELLED",
+      reason: "CONSENT_REVOKED",
+    });
+    expect(deps.identityRestore.restore).toHaveBeenCalledTimes(1);
+    expect(deps.quality.evaluate).not.toHaveBeenCalled();
+    expect(deps.persistence.persistCompleted).not.toHaveBeenCalled();
+  });
+
+  it("does not persist a result when consent is revoked after quality", async () => {
+    deps.persistence.readConsent
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false);
+
+    const result = await runTryOnWorkflow(makeInput(), deps);
+
+    expect(deps.quality.evaluate).toHaveBeenCalledTimes(1);
+    expect(deps.persistence.persistCompleted).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      status: "CANCELLED",
+      reason: "CONSENT_REVOKED",
+    });
+  });
+
+  it("treats a rejected consent-aware completion write as cancelled", async () => {
+    deps.persistence.persistCompleted.mockResolvedValue(false);
+
+    const result = await runTryOnWorkflow(makeInput(), deps);
+
+    expect(deps.persistence.persistCompleted).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({
+      status: "CANCELLED",
+      reason: "CONSENT_REVOKED",
+    });
   });
 
   it("auto-retries one failed quality check and then completes", async () => {

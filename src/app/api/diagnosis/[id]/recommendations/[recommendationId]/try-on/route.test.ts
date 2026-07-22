@@ -155,4 +155,20 @@ describe("POST recommendation try-on", () => {
       expect.objectContaining({ expectedStatuses: ["FAILED"] })
     );
   });
+
+  it("does not log provider exception details", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    mocks.runTryOnWorkflow.mockRejectedValue(
+      new Error("https://signed.example/face.jpg?secret=provider-token")
+    );
+
+    const response = await POST(request(), context);
+
+    expect(response.status).toBe(500);
+    expect(JSON.stringify(errorSpy.mock.calls)).not.toContain("provider-token");
+    expect(errorSpy).toHaveBeenCalledWith(
+      "Recommendation try-on error: TRY_ON_REQUEST_FAILED"
+    );
+    errorSpy.mockRestore();
+  });
 });

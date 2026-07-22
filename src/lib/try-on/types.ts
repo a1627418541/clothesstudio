@@ -64,10 +64,10 @@ export interface TryOnWorkflowPersistence {
     productSnapshotHash?: string | null;
   }>;
   readConsent(diagnosisId: string): Promise<boolean>;
-  setStatus(
-    recommendationId: string,
-    status: TryOnWorkflowStatusValue
-  ): Promise<void>;
+    setStatus(
+      recommendationId: string,
+      status: TryOnWorkflowStatusValue
+    ): Promise<boolean>;
   persistCompleted(input: {
     recommendationId: string;
     imageUrl: string;
@@ -75,11 +75,11 @@ export interface TryOnWorkflowPersistence {
     productFidelityScore: number;
     providerName: string;
     tryOnExpiresAt: Date | null;
-  }): Promise<void>;
+    }): Promise<boolean>;
   persistFailed(input: {
     recommendationId: string;
     failureCode: string;
-  }): Promise<void>;
+    }): Promise<boolean>;
   persistCancelled(input: {
     recommendationId: string;
     reason: string;

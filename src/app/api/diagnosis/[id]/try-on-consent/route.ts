@@ -75,7 +75,16 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       await tx.styleRecommendation.updateMany({
         where: {
           diagnosisId: id,
-          tryOnWorkflowStatus: { in: ["QUEUED", "FAILED"] },
+          tryOnWorkflowStatus: {
+            in: [
+              "QUEUED",
+              "APPLYING_GARMENTS",
+              "APPLYING_HAT",
+              "RESTORING_IDENTITY",
+              "QUALITY_CHECKING",
+              "FAILED",
+            ],
+          },
         },
         data: { tryOnWorkflowStatus: "CANCELLED" },
       });
@@ -102,8 +111,8 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       consent: parsed.data.consent,
       deletedGenerated: !parsed.data.consent && parsed.data.deleteGenerated,
     });
-  } catch (error) {
-    console.error("Try-on consent error:", error);
+  } catch {
+    console.error("Try-on consent error: CONSENT_UPDATE_FAILED");
     return NextResponse.json(
       { error: "CONSENT_UPDATE_FAILED" },
       { status: 500 }
