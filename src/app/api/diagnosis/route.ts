@@ -12,7 +12,11 @@ import {
 import { persistRecommendationPlan } from "@/lib/style-archetype/recommendation-persistence";
 import { createMockProductProvider } from "@/lib/marketplace/mock-product-provider";
 import { matchOutfitProductPlans } from "@/lib/marketplace/outfit-product-matcher";
-import { persistRecommendationProductPlans } from "@/lib/marketplace/recommendation-product-service";
+import {
+  hashProductSnapshots,
+  persistRecommendationProductPlans,
+} from "@/lib/marketplace/recommendation-product-service";
+import { runTryOnWorkflow } from "@/lib/try-on/prisma-try-on-workflow";
 
 function requiredItemNames(items: unknown): string[] {
   if (!Array.isArray(items)) return [];
@@ -198,13 +202,17 @@ export async function POST(request: NextRequest) {
       select: {
         id: true,
         rank: true,
+        isPrimary: true,
         title: true,
         colorPalette: true,
         items: true,
       },
     });
+    let productPlans: Awaited<
+      ReturnType<typeof matchOutfitProductPlans>
+    > | null = null;
     try {
-      const productPlans = await matchOutfitProductPlans({
+      productPlans = await matchOutfitProductPlans({
         budgetTier,
         providers: [
           createMockProductProvider("TAOBAO"),
@@ -230,6 +238,55 @@ export async function POST(request: NextRequest) {
         where: { id: { in: savedRecommendations.map(({ id }) => id) } },
         data: { productPlanStatus: "FAILED" },
       });
+    }
+
+    if (faceTryOnConsent && productPlans) {
+      const primary = savedRecommendations.find(
+        (recommendation) => recommendation.isPrimary
+      );
+      const primaryPlan = primary
+        ? productPlans.find((plan) => plan.rank === primary.rank)
+        : null;
+      if (primary && primaryPlan) {
+        const productSnapshotHash = hashProductSnapshots(
+          primaryPlan.products.map((product, index) => ({
+            ...product,
+            position: index + 1,
+          }))
+        );
+        try {
+          await runTryOnWorkflow({
+            diagnosisId: diagnosis.id,
+            recommendationId: primary.id,
+            trigger: "AUTO_PRIMARY",
+            isPrimary: true,
+            expectedStatuses: ["NOT_REQUESTED"],
+            consent: true,
+            fullBodyImageUrl: roleUrlMap.FULL_BODY,
+            faceImageUrl: roleUrlMap.FACE_FRONT,
+            productSnapshotHash,
+            products: primaryPlan.products.map((product) => ({
+              category: product.category,
+              imageUrl: product.imageUrl,
+            })),
+            diagnosisCreatedAt: diagnosis.createdAt,
+            isAnonymous: !diagnosis.userId,
+          });
+        } catch {
+          try {
+            await prisma.styleRecommendation.update({
+              where: { id: primary.id },
+              data: {
+                tryOnImageStatus: "FAILED",
+                tryOnWorkflowStatus: "FAILED",
+                tryOnFailureCode: "AUTO_TRY_ON_FAILED",
+              },
+            });
+          } catch {
+            // Diagnosis creation remains successful even if failure recording fails.
+          }
+        }
+      }
     }
 
     try {
