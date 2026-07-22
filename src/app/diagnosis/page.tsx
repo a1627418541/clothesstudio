@@ -54,6 +54,7 @@ export default function DiagnosisPage() {
     age: "",
     heightCm: "",
     weightKg: "",
+    budgetTier: "",
     faceTryOnConsent: false,
   });
 
@@ -138,6 +139,7 @@ export default function DiagnosisPage() {
       age: form.age ? Number(form.age) : undefined,
       heightCm: form.heightCm ? Number(form.heightCm) : undefined,
       weightKg: form.weightKg ? Number(form.weightKg) : undefined,
+      budgetTier: form.budgetTier,
       photoAssetIds,
       faceTryOnConsent: form.faceTryOnConsent,
     };
@@ -194,7 +196,8 @@ export default function DiagnosisPage() {
     form.gender &&
     form.age &&
     form.heightCm &&
-    form.weightKg;
+    form.weightKg &&
+    form.budgetTier;
 
   if (result) {
     const rec = result.primaryRecommendation;
@@ -378,6 +381,40 @@ export default function DiagnosisPage() {
                   </div>
                 </div>
 
+                <fieldset className="mt-7 border-t border-[var(--line)] pt-6">
+                  <legend className="pr-4 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink)]">
+                    整套商品预算
+                  </legend>
+                  <p className="mt-2 text-xs leading-5 text-[var(--muted-ink)]">
+                    我们会按这个预算推荐淘宝或京东可购买的实际单品。
+                  </p>
+                  <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    {[
+                      { value: "UNDER_500", label: "500 元以内" },
+                      { value: "FROM_500_TO_1000", label: "500–1000 元" },
+                      { value: "FROM_1000_TO_2000", label: "1000–2000 元" },
+                      { value: "ABOVE_2000", label: "2000 元以上" },
+                    ].map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setForm({ ...form, budgetTier: option.value })}
+                        className={[
+                          "min-h-12 border px-3 text-sm font-semibold transition-colors",
+                          form.budgetTier === option.value
+                            ? "border-[var(--oxblood)] bg-[#f7ecee] text-[var(--oxblood)]"
+                            : "border-[var(--line)] text-[var(--ink)] hover:border-[var(--oxblood)]",
+                        ].join(" ")}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                  {formErrors.budgetTier ? (
+                    <p className="mt-2 text-sm text-[var(--error)]">{formErrors.budgetTier}</p>
+                  ) : null}
+                </fieldset>
+
                 <div className="mt-6 border border-[var(--line)] bg-[var(--paper)] p-5">
                   <label className="flex items-start gap-3 cursor-pointer">
                     <input
@@ -387,8 +424,10 @@ export default function DiagnosisPage() {
                       className="mt-0.5 h-4 w-4 accent-[var(--oxblood)]"
                     />
                     <span className="text-sm leading-6 text-[var(--muted-ink)]">
-                      我同意将我的正面照片用于 AI 生成试穿效果图。该图仅用于本次诊断展示，不会用于其他目的。
-                      <span className="block text-xs text-[var(--muted-ink)]/70 mt-1">AI 生成效果图仅供参考，效果因照片质量而异。</span>
+                      我同意将正面照片用于生成本人试穿。勾选后会自动生成主推荐试穿图。
+                      <span className="mt-1 block text-xs text-[var(--muted-ink)]/70">
+                        不勾选也会正常生成报告与商品清单，之后可在结果页授权。AI 生成效果仅供参考。
+                      </span>
                     </span>
                   </label>
                 </div>

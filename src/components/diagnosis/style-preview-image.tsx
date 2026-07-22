@@ -28,7 +28,7 @@ export function StylePreviewImage({
       <div className={frameClass} role="status">
         <Loader2 className="h-7 w-7 animate-spin text-[var(--oxblood)]" aria-hidden="true" />
         <p className="mt-4 px-4 text-xs uppercase tracking-[0.12em] text-[var(--muted-ink)]">
-          Generating style preview…
+          正在生成搭配图片…
         </p>
       </div>
     );
@@ -39,7 +39,7 @@ export function StylePreviewImage({
       <div className={frameClass}>
         <ImageOff className="h-7 w-7 text-[#8c847b]" aria-hidden="true" />
         <p className="mt-4 px-4 text-xs uppercase tracking-[0.12em] text-[var(--muted-ink)]">
-          Style preview unavailable
+          搭配图片暂不可用
         </p>
       </div>
     );
@@ -51,7 +51,7 @@ export function StylePreviewImage({
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={url}
-          alt={`${title} style preview`}
+          alt={`${title} 搭配预览`}
           className="h-full w-full object-cover"
           loading="lazy"
         />

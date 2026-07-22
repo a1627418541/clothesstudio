@@ -2,20 +2,32 @@ import { Ban } from "lucide-react";
 import { EditorialLabel } from "@/components/ui/editorial-label";
 import { ReportRecommendation } from "@/types/diagnosis";
 import { ColorPalette } from "./color-palette";
+import { MarketplaceProductGrid } from "./marketplace-product-grid";
 import { RecommendationItems } from "./recommendation-items";
 import { RecommendationMeta } from "./recommendation-meta";
 import { StylePreviewImage } from "./style-preview-image";
+import { TryOnStatusPanel } from "./try-on-status-panel";
+
+interface PrimaryStyleDirectionProps {
+  recommendation: ReportRecommendation;
+  faceTryOnConsent?: boolean;
+  isGeneratingTryOn?: boolean;
+  onGenerateTryOn?: () => void;
+  onAuthorizeAndGenerate?: () => void;
+}
 
 export function PrimaryStyleDirection({
   recommendation,
-}: {
-  recommendation: ReportRecommendation;
-}) {
+  faceTryOnConsent = false,
+  isGeneratingTryOn = false,
+  onGenerateTryOn = () => undefined,
+  onAuthorizeAndGenerate = () => undefined,
+}: PrimaryStyleDirectionProps) {
   return (
     <section className="mb-14">
       <EditorialLabel>Primary style direction</EditorialLabel>
-      <article className="mt-5 grid grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] border border-[var(--line)] bg-[var(--surface)] shadow-[0_22px_65px_rgba(50,39,29,0.08)]">
-        <div className="border-r border-[var(--line)] p-8">
+      <article className="mt-5 grid border border-[var(--line)] bg-[var(--surface)] shadow-[0_22px_65px_rgba(50,39,29,0.08)] lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
+        <div className="border-b border-[var(--line)] p-6 lg:border-b-0 lg:border-r lg:p-8">
           <StylePreviewImage
             status={
               recommendation.tryOnImageStatus === "COMPLETED" || recommendation.tryOnImageUrl
@@ -27,14 +39,22 @@ export function PrimaryStyleDirection({
             aspect="4/5"
             disclosure={
               recommendation.tryOnImageUrl
-                ? "AI 生成效果图，仅供参考"
+                ? "本人试穿为 AI 生成效果，仅供搭配参考"
                 : null
             }
           />
+          <TryOnStatusPanel
+            recommendation={recommendation}
+            faceTryOnConsent={faceTryOnConsent}
+            isPrimary
+            isGenerating={isGeneratingTryOn}
+            onGenerate={onGenerateTryOn}
+            onAuthorizeAndGenerate={onAuthorizeAndGenerate}
+          />
         </div>
-        <div className="p-10">
+        <div className="p-7 lg:p-10">
           <p className="text-xs uppercase tracking-[0.18em] text-[var(--oxblood)]">Direction 01</p>
-          <h2 className="mt-4 font-editorial text-6xl font-medium leading-[0.9] text-[var(--ink)]">
+          <h2 className="mt-4 font-editorial text-5xl font-medium leading-[0.9] text-[var(--ink)] lg:text-6xl">
             {recommendation.title}
           </h2>
           {recommendation.description ? (
@@ -58,6 +78,7 @@ export function PrimaryStyleDirection({
             <h3 className="mb-4 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink)]">Color direction</h3>
             <ColorPalette colors={recommendation.colorPalette} />
           </div>
+          <MarketplaceProductGrid recommendation={recommendation} />
           {recommendation.avoidTips.length > 0 ? (
             <div className="mt-8 border-l-2 border-[var(--oxblood)] bg-[#f8efef] p-5">
               <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink)]">
