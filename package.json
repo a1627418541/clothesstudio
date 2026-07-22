@@ -11,6 +11,8 @@
     "seed": "tsx prisma/seed-style-archetypes.ts",
     "readiness:archetype-v2": "tsx scripts/check-style-archetype-v2-readiness.ts",
     "cleanup:anonymous-media": "tsx scripts/cleanup-expired-anonymous-media.ts",
+    "benchmark:try-on": "tsx scripts/benchmark-domestic-try-on.ts",
+    "generate:try-on-benchmark-images": "tsx scripts/generate-try-on-benchmark-images.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {
@@ -31,6 +33,7 @@
     "prisma": "^7.8.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "tencentcloud-sdk-nodejs-aiart": "^4.1.218",
     "ws": "^8.21.0",
     "zod": "^4.4.3"
   },
