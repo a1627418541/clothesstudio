@@ -10,6 +10,7 @@
     "lint": "eslint",
     "seed": "tsx prisma/seed-style-archetypes.ts",
     "readiness:archetype-v2": "tsx scripts/check-style-archetype-v2-readiness.ts",
+    "cleanup:anonymous-media": "tsx scripts/cleanup-expired-anonymous-media.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {
