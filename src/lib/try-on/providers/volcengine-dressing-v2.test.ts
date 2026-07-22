@@ -193,6 +193,44 @@ describe("Volcengine DressingDiffusionV2 SDK client", () => {
     });
   });
 
+  it("matches the official signer output for a fixed request vector", async () => {
+    const transport = vi.fn().mockResolvedValue({
+      request_id: "submit-vector",
+      data: { task_id: "task-vector" },
+    });
+    const client = createVolcengineDressingSdkClient(
+      {
+        accessKeyId: "ak",
+        secretAccessKey: "sk",
+        region: "cn-beijing",
+      },
+      {
+        transport,
+        now: () => new Date("2026-07-22T10:00:00.000Z"),
+      }
+    );
+
+    await client.submit({
+      reqKey: "dressing_diffusionV2",
+      personImageUrl: "https://input.example/person.jpg",
+      garments: [{ type: "upper", imageUrl: "https://input.example/top.jpg" }],
+    });
+
+    const headers = Object.fromEntries(
+      Object.entries(transport.mock.calls[0][0].headers)
+        .map(([name, value]) => [name.toLowerCase(), value])
+    );
+    expect(headers["x-date"]).toBe("20260722T100000Z");
+    expect(headers["x-content-sha256"]).toBe(
+      "141e5fae43cf526c80dfaa9232a5bb6e3750c9968e5e70c80cb7a7d3e514e425"
+    );
+    expect(headers.authorization).toBe(
+      "HMAC-SHA256 Credential=ak/20260722/cn-beijing/cv/request, " +
+      "SignedHeaders=host;x-content-sha256;x-date, " +
+      "Signature=e93c3b6400b5bcd5338c88bf3565d39f477d6f427fe10d996a488b5eac94c540"
+    );
+  });
+
   it("queries the official action and parses running then done", async () => {
     const transport = vi.fn()
       .mockResolvedValueOnce({ request_id: "poll-1", data: { status: "running" } })

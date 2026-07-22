@@ -1,4 +1,4 @@
-import * as VolcengineOpenApi from "@volcengine/openapi";
+import { createHash, createHmac } from "node:crypto";
 import type { DomesticTryOnProvider } from "../benchmark/types";
 
 const SERVICE = "cv";
@@ -31,24 +31,83 @@ export interface VolcengineHttpRequest {
 
 export type VolcengineTransport = (request: VolcengineHttpRequest) => Promise<unknown>;
 
-interface SignableRequest {
+const UNSIGNABLE_HEADERS = new Set([
+  "authorization",
+  "content-type",
+  "content-length",
+  "user-agent",
+  "presigned-expires",
+  "expect",
+]);
+
+function sha256(value: string): string {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function hmac(key: string | Buffer, value: string): Buffer {
+  return createHmac("sha256", key).update(value).digest();
+}
+
+function uriEscape(value: string): string {
+  return encodeURIComponent(value).replace(/[!'()*]/g, (character) =>
+    `%${character.charCodeAt(0).toString(16).toUpperCase()}`
+  );
+}
+
+function addVolcengineAuthorization(input: {
+  accessKeyId: string;
+  secretAccessKey: string;
   region: string;
-  method: "POST";
-  params: Record<string, string>;
-  headers: Record<string, string>;
+  action: string;
   body: string;
+  headers: Record<string, string>;
+  date: Date;
+}): void {
+  const datetime = input.date.toISOString().replace(/[:\-]|\.\d{3}/g, "");
+  const shortDate = datetime.slice(0, 8);
+  const bodyHash = sha256(input.body);
+  input.headers["X-Date"] = datetime;
+  input.headers["X-Content-Sha256"] = bodyHash;
+
+  const signedHeaderEntries = Object.entries(input.headers)
+    .map(([name, value]) => [name.toLowerCase(), value.trim().replace(/\s+/g, " ")] as const)
+    .filter(([name]) => !UNSIGNABLE_HEADERS.has(name))
+    .sort(([left], [right]) => left.localeCompare(right));
+  const signedHeaders = signedHeaderEntries.map(([name]) => name).join(";");
+  const canonicalHeaders = signedHeaderEntries
+    .map(([name, value]) => `${name}:${value}`)
+    .join("\n");
+  const canonicalQuery = [
+    ["Action", input.action],
+    ["Version", VERSION],
+  ]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([name, value]) => `${uriEscape(name)}=${uriEscape(value)}`)
+    .join("&");
+  const canonicalRequest = [
+    "POST",
+    "/",
+    canonicalQuery,
+    `${canonicalHeaders}\n`,
+    signedHeaders,
+    bodyHash,
+  ].join("\n");
+  const scope = `${shortDate}/${input.region}/${SERVICE}/request`;
+  const stringToSign = [
+    "HMAC-SHA256",
+    datetime,
+    scope,
+    sha256(canonicalRequest),
+  ].join("\n");
+  const signingKey = hmac(
+    hmac(hmac(hmac(input.secretAccessKey, shortDate), input.region), SERVICE),
+    "request"
+  );
+  const signature = createHmac("sha256", signingKey).update(stringToSign).digest("hex");
+  input.headers.Authorization =
+    `HMAC-SHA256 Credential=${input.accessKeyId}/${scope}, ` +
+    `SignedHeaders=${signedHeaders}, Signature=${signature}`;
 }
-
-interface SignerInstance {
-  addAuthorization(
-    credentials: { accessKeyId: string; secretKey: string },
-    date?: Date
-  ): void;
-}
-
-type SignerConstructor = new (request: SignableRequest, service: string) => SignerInstance;
-
-const Signer = (VolcengineOpenApi as unknown as { Signer: SignerConstructor }).Signer;
 
 const wait = (milliseconds: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
@@ -154,10 +213,14 @@ export function createVolcengineDressingSdkClient(
     secretAccessKey: string;
     region?: string;
   },
-  dependencies: { transport?: VolcengineTransport } = {}
+  dependencies: {
+    transport?: VolcengineTransport;
+    now?: () => Date;
+  } = {}
 ): VolcengineDressingClient {
   const region = config.region ?? "cn-beijing";
   const transport = dependencies.transport ?? defaultTransport;
+  const now = dependencies.now ?? (() => new Date());
 
   async function request(
     action: string,
@@ -170,18 +233,15 @@ export function createVolcengineDressingSdkClient(
       "Content-Type": "application/json",
     };
     const serializedBody = JSON.stringify(body);
-    const signableRequest: SignableRequest = {
-      region,
-      method: "POST",
-      params,
-      headers,
-      body: serializedBody,
-    };
-    const signer = new Signer(signableRequest, SERVICE);
-    signer.addAuthorization({
+    addVolcengineAuthorization({
       accessKeyId: config.accessKeyId,
-      secretKey: config.secretAccessKey,
-    }, new Date());
+      secretAccessKey: config.secretAccessKey,
+      region,
+      action,
+      body: serializedBody,
+      headers,
+      date: now(),
+    });
 
     const query = new URLSearchParams(params).toString();
     return expectRecord(await transport({
