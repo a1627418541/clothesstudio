@@ -16,6 +16,38 @@ vi.mock("@/lib/prisma", () => ({
   },
 }));
 
+function marketplaceFields(index: number) {
+  return {
+    marketplacePlatform: "TAOBAO",
+    productTotalCents: 50_000 + index * 1_000,
+    productPlanStatus: "READY",
+    tryOnWorkflowStatus: index === 0 ? "COMPLETED" : "NOT_REQUESTED",
+    tryOnAttemptCount: index === 0 ? 1 : 0,
+    tryOnProvider: index === 0 ? "mock" : null,
+    identityScore: index === 0 ? 0.96 : null,
+    productFidelityScore: index === 0 ? 0.94 : null,
+    tryOnExpiresAt: new Date("2026-08-10T00:00:00.000Z"),
+    tryOnProductSnapshotHash: `sha256:products-${index}`,
+    products: ["TOP", "BOTTOM", "HAT"].map((category, position) => ({
+      id: `product-${index}-${position}`,
+      platform: "TAOBAO",
+      category,
+      title: `${category} product`,
+      imageUrl: `https://assets.example/${category.toLowerCase()}.jpg`,
+      purchaseUrl: `https://example.invalid/${index}/${position}`,
+      priceCents: 10_000,
+      currency: "CNY",
+      sellerName: "Mock seller",
+      color: "brown",
+      variantLabel: "Brown / M",
+      isOptional: false,
+      availabilityStatus: "AVAILABLE",
+      snapshotAt: new Date("2026-07-20T00:00:00.000Z"),
+      position: position + 1,
+    })),
+  };
+}
+
 function legacyRecommendations(withRelation = false) {
   return [0, 1, 2].map((index) => ({
     id: `rec-${index + 1}`,
@@ -47,6 +79,10 @@ function legacyRecommendations(withRelation = false) {
     previewImageUrl: null,
     previewImageStatus: "PENDING",
     previewImageError: null,
+    tryOnImageUrl: null,
+    tryOnImageStatus: "PENDING",
+    tryOnImageError: null,
+    ...marketplaceFields(index),
     ...(withRelation
       ? {
           archetype:
@@ -108,6 +144,10 @@ function v2Recommendations() {
       previewImageUrl: null,
       previewImageStatus: "PENDING",
       previewImageError: null,
+      tryOnImageUrl: null,
+      tryOnImageStatus: "PENDING",
+      tryOnImageError: null,
+      ...marketplaceFields(index),
     };
   });
 }
@@ -126,6 +166,9 @@ function makeDiagnosis(overrides: Record<string, unknown> = {}) {
     vibeKeywords: ["minimal"],
     summary: "Summary",
     status: "PREVIEW_READY",
+    budgetTier: "FROM_500_TO_1000",
+    faceTryOnConsent: true,
+    faceTryOnRevokedAt: null,
     createdAt: new Date("2026-07-11T00:00:00.000Z"),
     photos: [],
     recommendations: legacyRecommendations(),
@@ -175,7 +218,23 @@ describe("getDiagnosisDetailForViewer", () => {
       },
       matchScore: 87,
       canGeneratePreview: true,
+      marketplacePlatform: "TAOBAO",
+      productPlanStatus: "READY",
+      tryOnWorkflowStatus: "COMPLETED",
     });
+    expect(result.diagnosis.budgetTier).toBe("FROM_500_TO_1000");
+    expect(result.diagnosis.faceTryOnConsent).toBe(true);
+    expect(result.diagnosis.recommendations[0].products).toHaveLength(3);
+    expect(prisma.styleDiagnosis.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: expect.objectContaining({
+          recommendations: {
+            orderBy: { rank: "asc" },
+            include: { products: { orderBy: { position: "asc" } } },
+          },
+        }),
+      })
+    );
   });
 
   it("maps valid V2 exclusively from snapshots and never queries live relations", async () => {

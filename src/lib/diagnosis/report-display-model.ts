@@ -8,8 +8,16 @@ import {
   LegacyReportRecommendation,
   ReportArchetypeMetadata,
   ReportDisplayModel,
+  ReportMarketplaceProduct,
+  ReportTryOnWorkflowStatus,
   V2ReportRecommendation,
 } from "@/types/diagnosis";
+
+interface ReportMarketplaceProductRecord
+  extends Omit<ReportMarketplaceProduct, "snapshotAt"> {
+  snapshotAt: Date;
+  position?: number;
+}
 
 export type LegacyDisplayFallbackReason =
   | "TRUE_LEGACY_RECORD"
@@ -36,6 +44,17 @@ export interface ReportRecommendationRecord
   tryOnImageUrl: string | null;
   tryOnImageStatus: string;
   tryOnImageError: string | null;
+  marketplacePlatform?: "TAOBAO" | "JD" | null;
+  productTotalCents?: number | null;
+  productPlanStatus?: "PENDING" | "READY" | "FAILED" | "STALE";
+  products?: ReportMarketplaceProductRecord[];
+  tryOnWorkflowStatus?: ReportTryOnWorkflowStatus;
+  tryOnAttemptCount?: number;
+  tryOnProvider?: string | null;
+  identityScore?: number | null;
+  productFidelityScore?: number | null;
+  tryOnExpiresAt?: Date | null;
+  tryOnProductSnapshotHash?: string | null;
   archetype?: ReportArchetypeMetadata | null;
 }
 
@@ -65,6 +84,37 @@ function isValidRecommendationItem(value: unknown): value is RecommendationItem 
 function normalizeItems(items: unknown): RecommendationItem[] {
   if (!Array.isArray(items)) return [];
   return items.filter(isValidRecommendationItem);
+}
+
+function projectMarketplace(record: ReportRecommendationRecord) {
+  return {
+    marketplacePlatform: record.marketplacePlatform ?? null,
+    productTotalCents: record.productTotalCents ?? null,
+    productPlanStatus: record.productPlanStatus ?? "PENDING",
+    products: (record.products ?? []).map((product) => ({
+      id: product.id,
+      platform: product.platform,
+      category: product.category,
+      title: product.title,
+      imageUrl: product.imageUrl,
+      purchaseUrl: product.purchaseUrl,
+      priceCents: product.priceCents,
+      currency: product.currency,
+      sellerName: product.sellerName,
+      color: product.color,
+      variantLabel: product.variantLabel,
+      isOptional: product.isOptional,
+      availabilityStatus: product.availabilityStatus,
+      snapshotAt: product.snapshotAt.toISOString(),
+    })),
+    tryOnWorkflowStatus: record.tryOnWorkflowStatus ?? "NOT_REQUESTED",
+    tryOnAttemptCount: record.tryOnAttemptCount ?? 0,
+    tryOnProvider: record.tryOnProvider ?? null,
+    identityScore: record.identityScore ?? null,
+    productFidelityScore: record.productFidelityScore ?? null,
+    tryOnExpiresAt: record.tryOnExpiresAt?.toISOString() ?? null,
+    tryOnProductSnapshotHash: record.tryOnProductSnapshotHash ?? null,
+  };
 }
 
 function hasUnsupportedSnapshotVersion(
@@ -153,6 +203,7 @@ function buildV2Model(
       tryOnImageUrl: record.tryOnImageUrl,
       tryOnImageStatus: record.tryOnImageStatus,
       tryOnImageError: record.tryOnImageError,
+      ...projectMarketplace(record),
       archetype: {
         id: snapshot.provenance.archetypeId,
         name: snapshot.identity.name,
@@ -212,6 +263,7 @@ function buildLegacyModel(
       tryOnImageUrl: record.tryOnImageUrl,
       tryOnImageStatus: record.tryOnImageStatus,
       tryOnImageError: record.tryOnImageError,
+      ...projectMarketplace(record),
       archetype: isTrueLegacy ? record.archetype ?? null : null,
       matchScore: record.matchScore,
       personalityLabel: isTrueLegacy
