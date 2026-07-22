@@ -30,7 +30,8 @@ describe("diagnosisFormSchema marketplace fields", () => {
   });
 
   it("rejects a missing or arbitrary budget tier", () => {
-    const { budgetTier: _removed, ...withoutBudget } = validInput;
+    const withoutBudget: Record<string, unknown> = { ...validInput };
+    delete withoutBudget.budgetTier;
     expect(diagnosisFormSchema.safeParse(withoutBudget).success).toBe(false);
     expect(
       diagnosisFormSchema.safeParse({
