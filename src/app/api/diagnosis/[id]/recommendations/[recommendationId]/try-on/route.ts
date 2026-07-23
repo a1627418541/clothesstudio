@@ -3,6 +3,10 @@ import { auth } from "@/lib/auth";
 import { getAnonymousSessionByToken } from "@/lib/anonymous-session";
 import { prisma } from "@/lib/prisma";
 import { runTryOnWorkflow } from "@/lib/try-on/prisma-try-on-workflow";
+import { generateGarmentImagesForPlan } from "@/lib/try-on/garment-image-generator";
+import type { ProductWithGeneratedImage } from "@/lib/try-on/garment-image-generator";
+import type { OutfitProductPlan } from "@/lib/marketplace/outfit-product-matcher";
+import type { ProductSnapshot } from "@/lib/marketplace/types";
 
 interface RouteContext {
   params: Promise<{ id: string; recommendationId: string }>;
@@ -15,6 +19,34 @@ const PROCESSING_STATUSES = new Set([
   "RESTORING_IDENTITY",
   "QUALITY_CHECKING",
 ]);
+
+function needsGeneratedGarmentImage(imageUrl: string): boolean {
+  return imageUrl.startsWith("data:") || imageUrl.includes("example.invalid");
+}
+
+interface RecommendationWithProducts {
+  id: string;
+  rank: number;
+  isPrimary: boolean;
+  title: string;
+  marketplacePlatform: string | null;
+  productTotalCents: number | null;
+  productPlanStatus: string;
+  tryOnWorkflowStatus: string;
+  tryOnProductSnapshotHash: string | null;
+  products: ProductSnapshot[];
+}
+
+function buildProductPlanFromRecommendation(
+  recommendation: RecommendationWithProducts
+): OutfitProductPlan {
+  return {
+    rank: recommendation.rank,
+    platform: (recommendation.marketplacePlatform as "TAOBAO" | "JD") ?? "TAOBAO",
+    totalCents: recommendation.productTotalCents ?? 0,
+    products: recommendation.products,
+  };
+}
 
 export async function POST(request: NextRequest, { params }: RouteContext) {
   try {
@@ -66,8 +98,8 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     const categories = new Set(
       recommendation.products.map((product) => product.category)
     );
-    const completeProducts = ["TOP", "BOTTOM", "HAT"].every((category) =>
-      categories.has(category as "TOP" | "BOTTOM" | "HAT")
+    const completeProducts = ["TOP", "BOTTOM"].every((category) =>
+      categories.has(category as "TOP" | "BOTTOM")
     );
     const productPlanReady =
       recommendation.productPlanStatus === "READY" &&
@@ -114,6 +146,36 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       );
     }
 
+    let workflowProducts = recommendation.products.map((product) => ({
+      category: product.category,
+      imageUrl: product.imageUrl,
+    }));
+
+    if (recommendation.products.some((product) => needsGeneratedGarmentImage(product.imageUrl))) {
+      const plan = buildProductPlanFromRecommendation(recommendation as RecommendationWithProducts);
+      const generatedPlan = await generateGarmentImagesForPlan(plan, {
+        styleDirection: recommendation.title,
+      });
+
+      await prisma.$transaction(async (tx) => {
+        for (const product of generatedPlan.products as ProductWithGeneratedImage[]) {
+          await tx.recommendationProduct.updateMany({
+            where: {
+              recommendationId: recommendation.id,
+              externalProductId: product.externalProductId,
+              externalSkuId: product.externalSkuId,
+            },
+            data: { imageUrl: product.generatedImageUrl },
+          });
+        }
+      });
+
+      workflowProducts = (generatedPlan.products as ProductWithGeneratedImage[]).map((product) => ({
+        category: product.category,
+        imageUrl: product.generatedImageUrl,
+      }));
+    }
+
     const result = await runTryOnWorkflow({
       diagnosisId: diagnosis.id,
       recommendationId: recommendation.id,
@@ -124,10 +186,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       fullBodyImageUrl,
       faceImageUrl,
       productSnapshotHash: recommendation.tryOnProductSnapshotHash!,
-      products: recommendation.products.map((product) => ({
-        category: product.category,
-        imageUrl: product.imageUrl,
-      })),
+      products: workflowProducts,
       diagnosisCreatedAt: diagnosis.createdAt,
       isAnonymous: !diagnosis.userId,
     });

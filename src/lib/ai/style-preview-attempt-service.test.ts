@@ -23,6 +23,7 @@ interface FakeRow {
   previewAttemptCount: number;
   previewImageUrl: string | null;
   previewImageError: string | null;
+  tryOnImageUrl: string | null;
 }
 
 interface FakeJob {
@@ -52,6 +53,7 @@ function createFakeClient(
       previewAttemptCount: 0,
       previewImageUrl: null,
       previewImageError: null,
+      tryOnImageUrl: null,
     },
     jobs: [],
     whereClauses: [],
@@ -117,6 +119,9 @@ function createFakeClient(
   const tx = {
     styleRecommendation: {
       updateMany,
+      findUnique: vi.fn(async () => ({
+        tryOnImageUrl: state.row.tryOnImageUrl,
+      })),
       findUniqueOrThrow: vi.fn(async () => ({
         previewAttemptCount: state.row.previewAttemptCount,
       })),
@@ -178,11 +183,12 @@ function v2Input(status: Status = "PENDING") {
   };
 }
 
-const completedImage = (prompt: string) => ({
+const completedImage = (prompt: string, tryOnUrl?: string) => ({
   status: "COMPLETED" as const,
   prompt,
   providerName: "mock",
   url: "https://r2.example.com/result.png",
+  ...(tryOnUrl ? { tryOnUrl } : {}),
 });
 
 describe("style preview attempt exact CAS and audit", () => {
@@ -238,6 +244,27 @@ describe("style preview attempt exact CAS and audit", () => {
       promptCompilerVersion: 1,
     });
     expect(fake.state.jobs[0]).toMatchObject({ status: "COMPLETED" });
+  });
+
+  it("does not overwrite an existing real try-on image URL", async () => {
+    const fake = createFakeClient("PENDING");
+    fake.state.row.tryOnImageUrl = "https://r2.example.com/real-try-on.png";
+    const input = v2Input();
+    const generateImage = vi.fn(async ({ prompt }: { prompt: string }) =>
+      completedImage(prompt, "https://r2.example.com/style-preview-try-on.png")
+    );
+
+    const result = await runStylePreviewAttempt(
+      { ...input, client: fake.client, expectedStatus: "PENDING" },
+      { generateImage }
+    );
+
+    expect(result).toMatchObject({ status: "COMPLETED" });
+    expect(fake.state.row).toMatchObject({
+      previewImageStatus: "COMPLETED",
+      previewImageUrl: "https://r2.example.com/result.png",
+      tryOnImageUrl: "https://r2.example.com/real-try-on.png",
+    });
   });
 
   it("allows explicit retry only from exact FAILED and replaces latest-attempt fields", async () => {

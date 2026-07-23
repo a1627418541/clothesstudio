@@ -76,7 +76,6 @@ function makeInput(
         category: "BOTTOM" as const,
         imageUrl: "https://assets.example/bottom.jpg",
       },
-      { category: "HAT" as const, imageUrl: "https://assets.example/hat.jpg" },
     ],
     diagnosisCreatedAt: new Date("2026-07-20T00:00:00.000Z"),
     isAnonymous: true,
@@ -114,7 +113,7 @@ describe("runTryOnWorkflow", () => {
 
   it("rejects incomplete products and a stale snapshot before providers", async () => {
     const incomplete = await runTryOnWorkflow(
-      makeInput({ products: makeInput().products.slice(0, 2) }),
+      makeInput({ products: makeInput().products.slice(0, 1) }),
       deps
     );
     expect(incomplete).toEqual({
@@ -145,33 +144,28 @@ describe("runTryOnWorkflow", () => {
     expect(deps.virtualTryOn.applyGarment).not.toHaveBeenCalled();
   });
 
-  it("applies garments before the hat and persists anonymous expiry", async () => {
+  it("applies garments in order and persists anonymous expiry", async () => {
     const callOrder: string[] = [];
     deps.virtualTryOn.applyGarment.mockImplementation(async (input) => {
       callOrder.push(input.category);
-      return { imageUrl: input.personImageUrl };
-    });
-    deps.virtualTryOn.applyHat.mockImplementation(async (input) => {
-      callOrder.push("HAT");
       return { imageUrl: input.personImageUrl };
     });
 
     const result = await runTryOnWorkflow(
       makeInput({
         products: [
-          ...makeInput().products.slice(0, 2),
+          ...makeInput().products,
           {
             category: "OUTERWEAR",
             imageUrl: "https://assets.example/outerwear.jpg",
           },
-          makeInput().products[2],
         ],
       }),
       deps
     );
 
     expect(result.status).toBe("COMPLETED");
-    expect(callOrder).toEqual(["TOP", "BOTTOM", "OUTERWEAR", "HAT"]);
+    expect(callOrder).toEqual(["TOP", "BOTTOM", "OUTERWEAR"]);
     expect(deps.persistence.persistCompleted).toHaveBeenCalledWith(
       expect.objectContaining({
         recommendationId: "rec-1",
@@ -263,7 +257,7 @@ describe("runTryOnWorkflow", () => {
     expect(result.status).toBe("COMPLETED");
     expect(deps.quality.evaluate).toHaveBeenCalledTimes(2);
     expect(deps.virtualTryOn.applyGarment).toHaveBeenCalledTimes(4);
-    expect(deps.virtualTryOn.applyHat).toHaveBeenCalledTimes(2);
+    expect(deps.virtualTryOn.applyHat).not.toHaveBeenCalled();
   });
 
   it("fails with a safe code after exactly two quality attempts", async () => {

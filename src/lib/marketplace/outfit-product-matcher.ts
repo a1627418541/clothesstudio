@@ -1,13 +1,11 @@
 import {
-  budgetRangeForTier,
   type BudgetTierValue,
   type MarketplacePlatformValue,
-  type MarketplaceProductProvider,
   type ProductCategoryValue,
   type ProductSnapshot,
 } from "./types";
 
-const REQUIRED_CATEGORIES = ["TOP", "BOTTOM", "HAT"] as const;
+const REQUIRED_CATEGORIES: ProductCategoryValue[] = ["TOP", "BOTTOM"];
 
 export interface OutfitRecommendationInput {
   rank: number;
@@ -35,99 +33,48 @@ export class OutfitPlanningError extends Error {
 
 interface MatchOutfitProductPlansInput {
   budgetTier: BudgetTierValue;
-  providers: MarketplaceProductProvider[];
   recommendations: OutfitRecommendationInput[];
+  providers?: unknown;
 }
 
-interface ScoredPlan extends OutfitProductPlan {
-  score: number;
-  sequence: number;
+const FALLBACK_PLATFORM: MarketplacePlatformValue = "TAOBAO";
+
+function makeGeneratedProduct(
+  input: OutfitRecommendationInput,
+  category: ProductCategoryValue,
+  index: number
+): ProductSnapshot {
+  const color = input.colorPalette[0] ?? "neutral";
+  const title = `${input.title} ${category.toLowerCase()}`;
+  return {
+    platform: FALLBACK_PLATFORM,
+    externalProductId: `gen-${category.toLowerCase()}-${input.rank}-${index}`,
+    externalSkuId: `gen-${category.toLowerCase()}-${input.rank}-${index}`,
+    category,
+    title,
+    imageUrl: "data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=",
+    purchaseUrl: `https://example.invalid/${category.toLowerCase()}`,
+    priceCents: 0,
+    currency: "CNY",
+    sellerName: "AI Generated",
+    color,
+    variantLabel: "AI generated",
+    availabilityStatus: "AVAILABLE",
+    snapshotAt: new Date(),
+  };
 }
 
-function productScore(product: ProductSnapshot, colors: Set<string>): number {
-  return colors.has(product.color.toLowerCase()) ? 100 : 0;
-}
-
-async function planForProvider(input: {
-  provider: MarketplaceProductProvider;
-  recommendation: OutfitRecommendationInput;
-  budgetTier: BudgetTierValue;
-}): Promise<ScoredPlan | null> {
-  const { provider, recommendation, budgetTier } = input;
-  const budget = budgetRangeForTier(budgetTier);
-  const searchInput = (category: ProductCategoryValue) =>
-    provider.search({
-      category,
-      colors: recommendation.colorPalette,
-      keywords: [recommendation.title, ...recommendation.requiredItems],
-      minPriceCents: 0,
-      maxPriceCents: budget.maxCents,
-      limit: 20,
-    });
-  const [topsResult, bottomsResult, hatsResult, outerwearResult] =
-    await Promise.all([
-      searchInput("TOP"),
-      searchInput("BOTTOM"),
-      searchInput("HAT"),
-      searchInput("OUTERWEAR"),
-    ]);
-  const offset = Math.max(0, recommendation.rank - 1);
-  const onlyProviderProducts = (products: ProductSnapshot[]) =>
-    products.filter((product) => product.platform === provider.platform);
-  const tops = onlyProviderProducts(topsResult.products);
-  const bottoms = onlyProviderProducts(bottomsResult.products);
-  const hats = onlyProviderProducts(hatsResult.products);
-  const outerwear = onlyProviderProducts(outerwearResult.products);
-
-  if ([tops, bottoms, hats].some((products) => products.length === 0)) {
-    return null;
-  }
-
-  const colors = new Set(
-    recommendation.colorPalette.map((color) => color.trim().toLowerCase())
-  );
-  const candidates: ScoredPlan[] = [];
-  let sequence = 0;
-
-  for (const top of tops) {
-    for (const bottom of bottoms) {
-      for (const hat of hats) {
-        for (const optionalOuterwear of [undefined, ...outerwear]) {
-          const products = [
-            top,
-            bottom,
-            ...(optionalOuterwear ? [optionalOuterwear] : []),
-            hat,
-          ];
-          const totalCents = products.reduce(
-            (total, product) => total + product.priceCents,
-            0
-          );
-          const withinMaximum =
-            budget.maxCents === null || totalCents <= budget.maxCents;
-          if (totalCents < budget.minCents || !withinMaximum) continue;
-
-          candidates.push({
-            rank: recommendation.rank,
-            platform: provider.platform,
-            products,
-            totalCents,
-            score:
-              products.reduce(
-                (total, product) => total + productScore(product, colors),
-                0
-              ) + (optionalOuterwear ? 5 : 0),
-            sequence: sequence++,
-          });
-        }
-      }
-    }
-  }
-
-  candidates.sort(
-    (left, right) => right.score - left.score || left.sequence - right.sequence
-  );
-  return candidates[offset % candidates.length] ?? null;
+function matchRecommendationPlan(
+  recommendation: OutfitRecommendationInput
+): OutfitProductPlan {
+  return {
+    rank: recommendation.rank,
+    platform: FALLBACK_PLATFORM,
+    products: REQUIRED_CATEGORIES.map((category, index) =>
+      makeGeneratedProduct(recommendation, category, index)
+    ),
+    totalCents: 0,
+  };
 }
 
 export async function matchOutfitProductPlans(
@@ -137,38 +84,10 @@ export async function matchOutfitProductPlans(
     throw new OutfitPlanningError("NO_COMPLETE_SINGLE_PLATFORM_PLAN");
   }
 
-  const plans: OutfitProductPlan[] = [];
-  for (const recommendation of [...input.recommendations].sort(
-    (left, right) => left.rank - right.rank
-  )) {
-    const candidates = (
-      await Promise.all(
-        input.providers.map((provider) =>
-          planForProvider({
-            provider,
-            recommendation,
-            budgetTier: input.budgetTier,
-          })
-        )
-      )
-    ).filter((candidate): candidate is ScoredPlan => candidate !== null);
-    candidates.sort((left, right) => right.score - left.score);
-    const selected = candidates[0];
-    if (!selected) {
-      throw new OutfitPlanningError("NO_COMPLETE_SINGLE_PLATFORM_PLAN");
-    }
-    plans.push({
-      rank: selected.rank,
-      platform: selected.platform,
-      products: selected.products,
-      totalCents: selected.totalCents,
-    });
-  }
-
-  if (plans.length !== 3) {
-    throw new OutfitPlanningError("NO_COMPLETE_SINGLE_PLATFORM_PLAN");
-  }
-  return plans;
+  return input.recommendations
+    .slice()
+    .sort((left, right) => left.rank - right.rank)
+    .map(matchRecommendationPlan);
 }
 
 export { REQUIRED_CATEGORIES };

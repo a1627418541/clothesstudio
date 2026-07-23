@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   matchOutfitProductPlans: vi.fn(),
   hashProductSnapshots: vi.fn(),
   persistRecommendationProductPlans: vi.fn(),
+  generateGarmentImagesForPlan: vi.fn(),
   runTryOnWorkflow: vi.fn(),
 }));
 
@@ -45,6 +46,9 @@ vi.mock("@/lib/marketplace/recommendation-product-service", () => ({
 }));
 vi.mock("@/lib/try-on/prisma-try-on-workflow", () => ({
   runTryOnWorkflow: mocks.runTryOnWorkflow,
+}));
+vi.mock("@/lib/try-on/garment-image-generator", () => ({
+  generateGarmentImagesForPlan: mocks.generateGarmentImagesForPlan,
 }));
 vi.mock("@/lib/ai/style-ai-service", () => ({
   StyleAiService: class {
@@ -195,19 +199,56 @@ describe("POST /api/diagnosis Archetype V2 integration", () => {
         isPrimary: rank === 1,
         title: `Direction ${rank}`,
         colorPalette: ["brown", "cream"],
-        items: [{ category: "top" }, { category: "bottom" }, { category: "hat" }],
+        items: [{ category: "top" }, { category: "bottom" }],
       }))
     );
     mocks.matchOutfitProductPlans.mockResolvedValue(
       [1, 2, 3].map((rank) => ({
         rank,
         platform: "TAOBAO",
-        products: [],
-        totalCents: 80_000,
+        products: [
+          {
+            platform: "TAOBAO",
+            externalProductId: `gen-top-${rank}`,
+            externalSkuId: `gen-top-${rank}`,
+            category: "TOP",
+            title: `Direction ${rank} top`,
+            imageUrl: "data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=",
+            purchaseUrl: "https://example.invalid/top",
+            priceCents: 0,
+            currency: "CNY",
+            sellerName: "AI Generated",
+            color: "brown",
+            variantLabel: "AI generated",
+            availabilityStatus: "AVAILABLE",
+            snapshotAt: new Date(),
+          },
+          {
+            platform: "TAOBAO",
+            externalProductId: `gen-bottom-${rank}`,
+            externalSkuId: `gen-bottom-${rank}`,
+            category: "BOTTOM",
+            title: `Direction ${rank} bottom`,
+            imageUrl: "data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=",
+            purchaseUrl: "https://example.invalid/bottom",
+            priceCents: 0,
+            currency: "CNY",
+            sellerName: "AI Generated",
+            color: "cream",
+            variantLabel: "AI generated",
+            availabilityStatus: "AVAILABLE",
+            snapshotAt: new Date(),
+          },
+        ],
+        totalCents: 0,
       }))
     );
     mocks.persistRecommendationProductPlans.mockResolvedValue(undefined);
     mocks.hashProductSnapshots.mockReturnValue("sha256:products");
+    mocks.generateGarmentImagesForPlan.mockImplementation(async (plan: { products: Array<{ imageUrl: string }> }) => ({
+      ...plan,
+      products: plan.products.map((product) => ({ ...product, generatedImageUrl: product.imageUrl })),
+    }));
     mocks.markProductPlansFailed.mockResolvedValue({ count: 3 });
     mocks.markTryOnFailed.mockResolvedValue({});
     mocks.runTryOnWorkflow.mockResolvedValue({
@@ -241,6 +282,9 @@ describe("POST /api/diagnosis Archetype V2 integration", () => {
           createdRecommendations.push(...data);
           return { count: data.length };
         }),
+      },
+      recommendationProduct: {
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       },
     };
     mocks.transaction.mockImplementation(
@@ -280,7 +324,7 @@ describe("POST /api/diagnosis Archetype V2 integration", () => {
     ).toBe(true);
   });
 
-  it("persists the budget and attaches three marketplace product plans", async () => {
+  it("attaches three generated product plans for recommendations", async () => {
     const response = await POST(makeRequest());
 
     expect(response.status).toBe(201);

@@ -1,37 +1,28 @@
-import { describe, expect, it, vi } from "vitest";
-import { createMockProductProvider } from "./mock-product-provider";
+import { describe, expect, it } from "vitest";
 import { matchOutfitProductPlans } from "./outfit-product-matcher";
-import type { ProductSearchInput } from "./types";
-
-const completeProviders = [
-  createMockProductProvider("TAOBAO"),
-  createMockProductProvider("JD"),
-];
 
 const matcherInput = {
   budgetTier: "FROM_500_TO_1000" as const,
-  providers: completeProviders,
   recommendations: [1, 2, 3].map((rank) => ({
     rank,
     title: `Direction ${rank}`,
     colorPalette: ["brown", "cream"],
-    requiredItems: ["top", "bottom", "hat"],
+    requiredItems: ["top", "bottom"],
   })),
 };
 
 describe("matchOutfitProductPlans", () => {
-  it("returns three complete plans without mixing platforms", async () => {
+  it("returns three generated plans with TOP and BOTTOM", async () => {
     const plans = await matchOutfitProductPlans(matcherInput);
 
     expect(plans).toHaveLength(3);
     for (const plan of plans) {
-      expect(new Set(plan.products.map((product) => product.platform)).size).toBe(
-        1
-      );
-      expect(plan.products.map((product) => product.category)).toEqual(
-        expect.arrayContaining(["TOP", "BOTTOM", "HAT"])
-      );
-      expect(plan.totalCents).toBeLessThanOrEqual(100_000);
+      expect(plan.products.map((product) => product.category).sort()).toEqual([
+        "BOTTOM",
+        "TOP",
+      ]);
+      expect(plan.totalCents).toBe(0);
+      expect(plan.platform).toBe("TAOBAO");
     }
     expect(
       new Set(
@@ -42,39 +33,20 @@ describe("matchOutfitProductPlans", () => {
     ).toBe(3);
   });
 
-  it("tries the other platform instead of mixing when one is incomplete", async () => {
-    const taobao = createMockProductProvider("TAOBAO");
-    const incompleteTaobao = {
-      ...taobao,
-      search: vi.fn(async (input: ProductSearchInput) =>
-        input.category === "HAT" ? { products: [] } : taobao.search(input)
-      ),
-    };
+  it("uses the first color in the palette for generated products", async () => {
     const plans = await matchOutfitProductPlans({
       ...matcherInput,
-      providers: [incompleteTaobao, createMockProductProvider("JD")],
+      recommendations: [1, 2, 3].map((rank) => ({
+        rank,
+        title: `Direction ${rank}`,
+        colorPalette: ["navy"],
+        requiredItems: ["top", "bottom"],
+      })),
     });
 
-    expect(plans[0].platform).toBe("JD");
-    expect(
-      plans[0].products.every((product) => product.platform === "JD")
-    ).toBe(true);
-  });
-
-  it("keeps the lowest tier under 500 yuan and omits outerwear first", async () => {
-    const plans = await matchOutfitProductPlans({
-      ...matcherInput,
-      budgetTier: "UNDER_500",
-    });
-
-    for (const plan of plans) {
-      expect(plan.totalCents).toBeLessThanOrEqual(50_000);
-      expect(plan.products.map((product) => product.category)).toEqual(
-        expect.arrayContaining(["TOP", "BOTTOM", "HAT"])
-      );
-      expect(plan.products.some((product) => product.category === "OUTERWEAR"))
-        .toBe(false);
-    }
+    expect(plans[0].products.every((product) => product.color === "navy")).toBe(
+      true
+    );
   });
 
   it("throws a typed error when three complete plans cannot be formed", async () => {

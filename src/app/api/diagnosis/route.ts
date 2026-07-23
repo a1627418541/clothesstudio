@@ -10,13 +10,14 @@ import {
   buildRecommendationPlan,
 } from "@/lib/style-archetype/recommendation-plan";
 import { persistRecommendationPlan } from "@/lib/style-archetype/recommendation-persistence";
-import { createMockProductProvider } from "@/lib/marketplace/mock-product-provider";
 import { matchOutfitProductPlans } from "@/lib/marketplace/outfit-product-matcher";
 import {
   hashProductSnapshots,
   persistRecommendationProductPlans,
 } from "@/lib/marketplace/recommendation-product-service";
 import { runTryOnWorkflow } from "@/lib/try-on/prisma-try-on-workflow";
+import { generateGarmentImagesForPlan } from "@/lib/try-on/garment-image-generator";
+import type { ProductWithGeneratedImage } from "@/lib/try-on/garment-image-generator";
 
 function requiredItemNames(items: unknown): string[] {
   if (!Array.isArray(items)) return [];
@@ -214,10 +215,6 @@ export async function POST(request: NextRequest) {
     try {
       productPlans = await matchOutfitProductPlans({
         budgetTier,
-        providers: [
-          createMockProductProvider("TAOBAO"),
-          createMockProductProvider("JD"),
-        ],
         recommendations: savedRecommendations.map((recommendation) => ({
           rank: recommendation.rank,
           title: recommendation.title,
@@ -255,6 +252,23 @@ export async function POST(request: NextRequest) {
           }))
         );
         try {
+          const generatedPlan = await generateGarmentImagesForPlan(primaryPlan, {
+            styleDirection: primary.title,
+          });
+
+          await prisma.$transaction(async (tx) => {
+            for (const product of generatedPlan.products as ProductWithGeneratedImage[]) {
+              await tx.recommendationProduct.updateMany({
+                where: {
+                  recommendationId: primary.id,
+                  externalProductId: product.externalProductId,
+                  externalSkuId: product.externalSkuId,
+                },
+                data: { imageUrl: product.generatedImageUrl },
+              });
+            }
+          });
+
           await runTryOnWorkflow({
             diagnosisId: diagnosis.id,
             recommendationId: primary.id,
@@ -265,9 +279,9 @@ export async function POST(request: NextRequest) {
             fullBodyImageUrl: roleUrlMap.FULL_BODY,
             faceImageUrl: roleUrlMap.FACE_FRONT,
             productSnapshotHash,
-            products: primaryPlan.products.map((product) => ({
+            products: (generatedPlan.products as ProductWithGeneratedImage[]).map((product) => ({
               category: product.category,
-              imageUrl: product.imageUrl,
+              imageUrl: product.generatedImageUrl,
             })),
             diagnosisCreatedAt: diagnosis.createdAt,
             isAnonymous: !diagnosis.userId,

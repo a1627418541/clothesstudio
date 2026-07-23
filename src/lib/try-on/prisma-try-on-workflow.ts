@@ -1,10 +1,10 @@
 import { TryOnWorkflowStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
-  createMockIdentityRestoreProvider,
   createMockTryOnQualityProvider,
   createMockVirtualTryOnProvider,
 } from "./mock-providers";
+import { createProductionIdentityRestoreProvider } from "./providers/identity-restore-factory";
 import { createTencentVirtualTryOnProvider } from "./providers/tencent-virtual-try-on";
 import { runTryOnWorkflow as orchestrateTryOnWorkflow } from "./try-on-orchestrator";
 import type {
@@ -164,7 +164,7 @@ function createProductionVirtualTryOnProvider(): VirtualTryOnProvider {
 export async function runTryOnWorkflow(input: RunTryOnWorkflowInput) {
   const dependencies: TryOnWorkflowDependencies = {
     virtualTryOn: createProductionVirtualTryOnProvider(),
-    identityRestore: createMockIdentityRestoreProvider(),
+    identityRestore: createProductionIdentityRestoreProvider(),
     quality: createMockTryOnQualityProvider(),
     persistence: createPersistence(),
   };
