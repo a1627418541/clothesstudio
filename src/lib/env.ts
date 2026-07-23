@@ -18,6 +18,10 @@ const envSchema = z.object({
   CLOUDFLARE_R2_BUCKET_NAME: z.string().optional(),
   CLOUDFLARE_R2_PUBLIC_BASE_URL: z.string().optional(),
 
+  // Optional face swap (Replicate)
+  REPLICATE_API_TOKEN: z.string().optional(),
+  FACE_SWAP_PROVIDER: z.string().optional(),
+
   // Reserved
   INNGEST_EVENT_KEY: z.string().optional(),
   INNGEST_SIGNING_KEY: z.string().optional(),
