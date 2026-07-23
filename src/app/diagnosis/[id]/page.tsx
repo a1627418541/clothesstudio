@@ -16,6 +16,8 @@ import {
   shouldAutoGenerateStylePreviews,
   shouldOfferStylePreviewRetry,
 } from "@/lib/ai/style-preview-policy";
+import { personalTryOnErrorMessage } from "@/components/diagnosis/personal-try-on-messages";
+import { postPersonalTryOn } from "@/lib/personal-try-on/personal-try-on-request";
 import { ReportRecommendation } from "@/types/diagnosis";
 
 interface DiagnosisDetail {
@@ -135,21 +137,27 @@ export default function DiagnosisDetailPage() {
           await fetchDiagnosis();
         }
 
-        const response = await fetch(
-          `/api/diagnosis/${id}/recommendations/${recommendationId}/try-on`,
-          { method: "POST" }
-        );
-        if (!response.ok) {
-          throw new Error("TRY_ON_REQUEST_FAILED");
+        const retry =
+          diagnosis?.recommendations.find(
+            (recommendation) => recommendation.id === recommendationId
+          )?.personalTryOn?.status === "FAILED";
+        const result = await postPersonalTryOn({
+          diagnosisId: id,
+          recommendationId,
+          retry,
+        });
+        if (!result.ok) {
+          setTryOnRequestError(personalTryOnErrorMessage(result.errorCode));
+          return;
         }
         await fetchDiagnosis();
       } catch {
-        setTryOnRequestError("本人试穿暂时无法生成，请稍后重试。");
+        setTryOnRequestError(personalTryOnErrorMessage(null));
       } finally {
         setGeneratingTryOnId(null);
       }
     },
-    [fetchDiagnosis, generatingTryOnId, id]
+    [fetchDiagnosis, generatingTryOnId, id, diagnosis]
   );
 
   if (loading) {

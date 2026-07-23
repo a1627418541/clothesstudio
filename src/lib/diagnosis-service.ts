@@ -3,7 +3,12 @@ import {
   buildReportDisplayModel,
   ReportRecommendationRecord,
 } from "@/lib/diagnosis/report-display-model";
-import { ReportDisplayModel, ReportRecommendation } from "@/types/diagnosis";
+import {
+  ReportDisplayModel,
+  ReportPersonalTryOnState,
+  ReportPersonalTryOnStatus,
+  ReportRecommendation,
+} from "@/types/diagnosis";
 import { DiagnosisPhotoRole } from "@prisma/client";
 
 export interface DiagnosisDetail {
@@ -35,6 +40,42 @@ export interface DiagnosisDetail {
 
 const PHOTO_ORDER: DiagnosisPhotoRole[] = ["FACE_FRONT", "FACE_SIDE", "FULL_BODY"];
 
+// Stable codes the generation service writes itself; anything else stored in
+// the error column is raw provider/storage detail and must not reach clients.
+const SAFE_PERSONAL_TRY_ON_ERROR_CODES = new Set([
+  "OWNER_REQUIRED",
+  "OWNER_AMBIGUOUS",
+  "GENERATION_ALREADY_CLAIMED",
+  "GENERATION_NOT_CLAIMABLE",
+  "ATTEMPT_CAP_REACHED",
+  "PERSONAL_TRY_ON_PROVIDER_FAILED",
+  "PERSONAL_TRY_ON_STORAGE_FAILED",
+]);
+
+function sanitizePersonalTryOnErrorCode(error: string | null): string | null {
+  if (!error) return null;
+  return SAFE_PERSONAL_TRY_ON_ERROR_CODES.has(error)
+    ? error
+    : "PERSONAL_TRY_ON_PROVIDER_FAILED";
+}
+
+function toPersonalTryOnState(
+  generation: {
+    status: string;
+    imageUrl: string | null;
+    error: string | null;
+    attemptCount: number;
+  } | null
+): ReportPersonalTryOnState | null {
+  if (!generation) return null;
+  return {
+    status: generation.status as ReportPersonalTryOnStatus,
+    imageUrl: generation.imageUrl,
+    errorCode: sanitizePersonalTryOnErrorCode(generation.error),
+    attemptCount: generation.attemptCount,
+  };
+}
+
 export async function getDiagnosisDetailForViewer({
   diagnosisId,
   userId,
@@ -57,7 +98,11 @@ export async function getDiagnosisDetailForViewer({
       },
       recommendations: {
         orderBy: { rank: "asc" },
-        include: { products: { orderBy: { position: "asc" } } },
+        include: {
+          products: { orderBy: { position: "asc" } },
+          // recommendationId is unique, so at most one generation exists.
+          personalTryOnGenerations: { take: 1 },
+        },
       },
     },
   });
@@ -122,6 +167,9 @@ export async function getDiagnosisDetailForViewer({
       productFidelityScore: rec.productFidelityScore,
       tryOnExpiresAt: rec.tryOnExpiresAt,
       tryOnProductSnapshotHash: rec.tryOnProductSnapshotHash,
+      personalTryOn: toPersonalTryOnState(
+        (rec.personalTryOnGenerations ?? [])[0] ?? null
+      ),
       archetype: null,
     }));
 

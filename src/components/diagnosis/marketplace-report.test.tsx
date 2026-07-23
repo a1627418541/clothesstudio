@@ -68,6 +68,7 @@ function recommendation(
     sceneMood: null,
     canGeneratePreview: true,
     canRetryPreview: true,
+    personalTryOn: null,
     ...overrides,
   } as ReportRecommendation;
 }

@@ -9,6 +9,7 @@ import {
   ReportArchetypeMetadata,
   ReportDisplayModel,
   ReportMarketplaceProduct,
+  ReportPersonalTryOnState,
   ReportTryOnWorkflowStatus,
   V2ReportRecommendation,
 } from "@/types/diagnosis";
@@ -55,6 +56,7 @@ export interface ReportRecommendationRecord
   productFidelityScore?: number | null;
   tryOnExpiresAt?: Date | null;
   tryOnProductSnapshotHash?: string | null;
+  personalTryOn?: ReportPersonalTryOnState | null;
   archetype?: ReportArchetypeMetadata | null;
 }
 
@@ -114,6 +116,7 @@ function projectMarketplace(record: ReportRecommendationRecord) {
     productFidelityScore: record.productFidelityScore ?? null,
     tryOnExpiresAt: record.tryOnExpiresAt?.toISOString() ?? null,
     tryOnProductSnapshotHash: record.tryOnProductSnapshotHash ?? null,
+    personalTryOn: record.personalTryOn ?? null,
   };
 }
 

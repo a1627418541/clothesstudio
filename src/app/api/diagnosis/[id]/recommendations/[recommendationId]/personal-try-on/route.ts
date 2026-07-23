@@ -9,6 +9,10 @@ import { mockPersonalTryOnProvider } from "@/lib/ai/mock-personal-try-on-provide
 import { buildProviderImageInput } from "@/lib/personal-try-on/provider-image-input";
 import { storeImageFromUrlOrBase64 } from "@/lib/r2-image-store";
 
+// Matches the longest duration this Vercel plan already runs in production
+// (style-previews route); the provider polling budget stays 30s below this.
+export const maxDuration = 180;
+
 interface RouteContext {
   params: Promise<{ id: string; recommendationId: string }>;
 }
@@ -22,6 +26,15 @@ function getProvider() {
 export async function POST(request: NextRequest, { params }: RouteContext) {
   try {
     const { id, recommendationId } = await params;
+    // Clients may send an optional JSON body ({ retry: true }) to make FAILED
+    // regeneration explicit. Claim/retry semantics are enforced by the
+    // generation service's exact-status CAS, so the flag is informational
+    // and the body is only drained tolerantly.
+    try {
+      await request.json();
+    } catch {
+      // Empty or non-JSON bodies are acceptable.
+    }
     const session = await auth();
     const userId = session?.user?.id ?? null;
     let anonymousSessionId: string | null = null;
