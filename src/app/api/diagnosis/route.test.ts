@@ -395,6 +395,27 @@ describe("POST /api/diagnosis Archetype V2 integration", () => {
     });
   });
 
+  it("marks auto try-on as failed when the workflow returns a non-completed result", async () => {
+    mocks.runTryOnWorkflow.mockResolvedValueOnce({
+      status: "SKIPPED",
+      reason: "NOT_CLAIMED",
+    });
+
+    const response = await POST(
+      makeRequest({ ...requestBody, faceTryOnConsent: true })
+    );
+
+    expect(response.status).toBe(201);
+    expect(mocks.markTryOnFailed).toHaveBeenCalledWith({
+      where: { id: "rec-1" },
+      data: {
+        tryOnImageStatus: "FAILED",
+        tryOnWorkflowStatus: "FAILED",
+        tryOnFailureCode: "AUTO_TRY_ON_FAILED",
+      },
+    });
+  });
+
   it("writes three immutable V2 snapshots when the flag and candidates are ready", async () => {
     process.env.STYLE_ARCHETYPE_V2_ENABLED = "true";
 
