@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   matchOutfitProductPlans: vi.fn(),
   hashProductSnapshots: vi.fn(),
   persistRecommendationProductPlans: vi.fn(),
+  generateGarmentImagesForPlan: vi.fn(),
   runTryOnWorkflow: vi.fn(),
 }));
 
@@ -45,6 +46,9 @@ vi.mock("@/lib/marketplace/recommendation-product-service", () => ({
 }));
 vi.mock("@/lib/try-on/prisma-try-on-workflow", () => ({
   runTryOnWorkflow: mocks.runTryOnWorkflow,
+}));
+vi.mock("@/lib/try-on/garment-image-generator", () => ({
+  generateGarmentImagesForPlan: mocks.generateGarmentImagesForPlan,
 }));
 vi.mock("@/lib/ai/style-ai-service", () => ({
   StyleAiService: class {
@@ -208,6 +212,10 @@ describe("POST /api/diagnosis Archetype V2 integration", () => {
     );
     mocks.persistRecommendationProductPlans.mockResolvedValue(undefined);
     mocks.hashProductSnapshots.mockReturnValue("sha256:products");
+    mocks.generateGarmentImagesForPlan.mockImplementation(async (plan: { products: Array<{ imageUrl: string }> }) => ({
+      ...plan,
+      products: plan.products.map((product) => ({ ...product, generatedImageUrl: product.imageUrl })),
+    }));
     mocks.markProductPlansFailed.mockResolvedValue({ count: 3 });
     mocks.markTryOnFailed.mockResolvedValue({});
     mocks.runTryOnWorkflow.mockResolvedValue({

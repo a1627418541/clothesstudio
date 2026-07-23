@@ -25,7 +25,7 @@ function getReplicateApiToken(): string | null {
 function getModelEndpoint(): string {
   return (
     process.env.REPLICATE_FACE_SWAP_MODEL?.trim() ||
-    "lucataco/face-swap:1fac7aa1c7b5f6a3497910b4da9acd8d1e7941f0a6a1f6a6b2a8e1b2d7e8f9a0"
+    "lucataco/modelscope-facefusion:52edbb2b42beb4e19242f0c9ad5717211a96c63ff1f0b0320caa518b2745f4f7"
   );
 }
 
@@ -46,8 +46,8 @@ async function startPrediction(
         ? modelEndpoint.split(":").pop()
         : undefined,
       input: {
-        swap_image: input.faceImageUrl,
-        target_image: input.sourceImageUrl,
+        user_image: input.faceImageUrl,
+        template_image: input.sourceImageUrl,
       },
     }),
   });
