@@ -1,5 +1,7 @@
 import { Loader2 } from "lucide-react";
 import type { ReportRecommendation, ReportTryOnWorkflowStatus } from "@/types/diagnosis";
+import { personalTryOnErrorMessage } from "./personal-try-on-messages";
+import { resolvePersonalTryOnView } from "./personal-try-on-view";
 
 export const TRY_ON_STATUS_LABELS: Record<ReportTryOnWorkflowStatus, string> = {
   NOT_REQUESTED: "尚未生成本人试穿",
@@ -29,25 +31,46 @@ export function TryOnStatusPanel({
   onGenerate: () => void;
   onAuthorizeAndGenerate?: () => void;
 }) {
-  const status = recommendation.tryOnWorkflowStatus;
-  const shouldOfferAuthorize = isPrimary && !faceTryOnConsent;
+  const view = resolvePersonalTryOnView(recommendation);
+  const shouldOfferAuthorize =
+    isPrimary &&
+    !faceTryOnConsent &&
+    (view.kind === "cta" || view.kind === "failed");
   const shouldOfferGenerate =
-    faceTryOnConsent &&
-    (status === "NOT_REQUESTED" || status === "FAILED");
-  const actionLabel = status === "FAILED"
-    ? "重新生成本人试穿"
-    : isPrimary
-      ? "生成本人试穿"
-      : "生成这套试穿";
+    !shouldOfferAuthorize && (view.kind === "cta" || view.kind === "failed");
+  const actionLabel =
+    view.kind === "failed"
+      ? "重新生成本人试穿"
+      : isPrimary
+        ? "生成本人试穿"
+        : "生成这套试穿";
+
+  const statusText = (() => {
+    if (shouldOfferAuthorize) return "尚未授权本人试穿";
+    switch (view.kind) {
+      case "pending":
+        return "准备生成";
+      case "processing":
+        return "本人试穿生成中";
+      case "completed":
+        return TRY_ON_STATUS_LABELS.COMPLETED;
+      case "unavailable":
+        return TRY_ON_STATUS_LABELS.FAILED;
+      case "failed":
+        return recommendation.personalTryOn
+          ? personalTryOnErrorMessage(view.errorCode)
+          : TRY_ON_STATUS_LABELS.FAILED;
+      default:
+        return TRY_ON_STATUS_LABELS.NOT_REQUESTED;
+    }
+  })();
 
   return (
     <section className="mt-6 border border-[var(--line)] bg-[#f8f4ef] p-5" aria-label="本人试穿状态">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--oxblood)]">Virtual try-on</p>
-          <p className="mt-2 text-sm font-semibold text-[var(--ink)]">
-            {shouldOfferAuthorize ? "尚未授权本人试穿" : TRY_ON_STATUS_LABELS[status]}
-          </p>
+          <p className="mt-2 text-sm font-semibold text-[var(--ink)]">{statusText}</p>
         </div>
         {shouldOfferAuthorize ? (
           <button

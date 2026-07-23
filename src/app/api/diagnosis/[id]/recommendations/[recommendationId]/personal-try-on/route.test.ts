@@ -1,6 +1,9 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
-import { POST } from "./route";
+import { POST, maxDuration } from "./route";
+import { PERSONAL_TRY_ON_POLL_BUDGET_MS } from "@/lib/ai/evolink-personal-try-on-provider";
+import { V2_ARCHETYPE_MANIFEST } from "@/lib/style-archetype/archetype-v2-manifest";
+import { buildV2RecommendationSnapshot } from "@/lib/style-archetype/recommendation-snapshot";
 
 const mocks = vi.hoisted(() => ({
   auth: vi.fn(),
@@ -27,6 +30,54 @@ function makeRequest(cookie?: string) {
     method: "POST",
     headers: cookie ? { cookie } : undefined,
   });
+}
+
+function makeRequestWithBody(body: unknown, cookie?: string) {
+  return new NextRequest("http://localhost/api/diagnosis/d1/recommendations/r1/personal-try-on", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      ...(cookie ? { cookie } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+}
+
+function passingDiagnosis() {
+  const archetype = V2_ARCHETYPE_MANIFEST.find((row) => row.slug === "old-money")!;
+  const snapshot = buildV2RecommendationSnapshot({
+    archetype,
+    rank: 1,
+    matchScore: 88,
+    subjectContext: {
+      genderPresentation: "MASCULINE",
+      bodyTypeHint: "rectangle",
+      faceShapeHint: "oval",
+      ageBand: "25-34",
+    },
+  });
+  return {
+    id: "d1",
+    userId: null,
+    anonymousSessionId: "anon-1",
+    faceTryOnConsent: true,
+    faceTryOnRevokedAt: null,
+    photos: [
+      { role: "FACE_FRONT", mediaAsset: { bucket: "bucket", key: "uploads/face.jpg" } },
+      { role: "FULL_BODY", mediaAsset: { bucket: "bucket", key: "uploads/body.jpg" } },
+    ],
+    recommendations: [
+      {
+        id: "r1",
+        sourceMode: "ARCHETYPE_V2",
+        archetypeVersion: snapshot.archetypeVersion,
+        archetypeSnapshot: snapshot,
+        archetypeId: snapshot.provenance.archetypeId,
+        matchScore: snapshot.selection.matchScore,
+        rank: 1,
+      },
+    ],
+  };
 }
 
 const params = Promise.resolve({ id: "d1", recommendationId: "r1" });
@@ -89,5 +140,34 @@ describe("POST /api/diagnosis/[id]/recommendations/[recommendationId]/personal-t
     mocks.getAnonymousSessionByToken.mockResolvedValue({ id: "anon-1" });
     const response = await POST(makeRequest("aps_anonymous_session=token"), { params });
     expect(response.status).toBe(409);
+  });
+
+  it("accepts an explicit retry body and still delegates to the service", async () => {
+    mocks.prisma.styleDiagnosis.findUnique.mockResolvedValue(passingDiagnosis());
+    mocks.getAnonymousSessionByToken.mockResolvedValue({ id: "anon-1" });
+
+    const response = await POST(makeRequestWithBody({ retry: true }, "aps_anonymous_session=token"), { params });
+
+    expect(response.status).toBe(200);
+    expect(mocks.runPersonalTryOnGeneration).toHaveBeenCalledTimes(1);
+  });
+
+  it("accepts a request without a body", async () => {
+    mocks.prisma.styleDiagnosis.findUnique.mockResolvedValue(passingDiagnosis());
+    mocks.getAnonymousSessionByToken.mockResolvedValue({ id: "anon-1" });
+
+    const response = await POST(makeRequest("aps_anonymous_session=token"), { params });
+
+    expect(response.status).toBe(200);
+    expect(mocks.runPersonalTryOnGeneration).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("personal try-on route duration budget", () => {
+  it("keeps the provider polling budget inside maxDuration with persistence headroom", () => {
+    // 180s is the highest duration this project's Vercel plan already runs in
+    // production (see the style-previews route), so never exceed it here.
+    expect(maxDuration).toBeLessThanOrEqual(180);
+    expect(maxDuration * 1000 - PERSONAL_TRY_ON_POLL_BUDGET_MS).toBeGreaterThanOrEqual(30_000);
   });
 });

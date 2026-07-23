@@ -47,6 +47,21 @@ export interface ReportTryOnState {
   tryOnProductSnapshotHash: string | null;
 }
 
+export type ReportPersonalTryOnStatus =
+  | "PENDING"
+  | "PROCESSING"
+  | "COMPLETED"
+  | "FAILED";
+
+// Client-safe projection of PersonalTryOnGeneration. Never contains prompt,
+// promptCompilerVersion, imageObjectKey, provider, or raw provider errors.
+export interface ReportPersonalTryOnState {
+  status: ReportPersonalTryOnStatus;
+  imageUrl: string | null;
+  errorCode: string | null;
+  attemptCount: number;
+}
+
 interface BaseReportRecommendation {
   id: string;
   rank: number;
@@ -78,6 +93,7 @@ interface BaseReportRecommendation {
   productFidelityScore: number | null;
   tryOnExpiresAt: string | null;
   tryOnProductSnapshotHash: string | null;
+  personalTryOn: ReportPersonalTryOnState | null;
   archetype: ReportArchetypeMetadata | null;
   matchScore: number | null;
   personalityLabel: string | null;

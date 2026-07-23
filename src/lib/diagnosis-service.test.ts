@@ -230,7 +230,10 @@ describe("getDiagnosisDetailForViewer", () => {
         include: expect.objectContaining({
           recommendations: {
             orderBy: { rank: "asc" },
-            include: { products: { orderBy: { position: "asc" } } },
+            include: {
+              products: { orderBy: { position: "asc" } },
+              personalTryOnGenerations: { take: 1 },
+            },
           },
         }),
       })
@@ -323,5 +326,75 @@ describe("getDiagnosisDetailForViewer", () => {
 
     expect(result).toEqual({ ok: false, code: "NOT_FOUND" });
     expect(prisma.styleRecommendation.findMany).not.toHaveBeenCalled();
+  });
+
+  it("includes personal try-on generations with sanitized safe fields only", async () => {
+    const recommendations = v2Recommendations();
+    recommendations[0] = {
+      ...recommendations[0],
+      personalTryOnGenerations: [
+        {
+          status: "COMPLETED",
+          imageUrl: "https://r2.example/personal.png",
+          error: null,
+          attemptCount: 2,
+          prompt: "secret-prompt-text",
+          promptCompilerVersion: 1,
+          imageObjectKey: "personal-try-on/secret-key",
+          provider: "evolink",
+        },
+      ],
+    } as (typeof recommendations)[number];
+    recommendations[1] = {
+      ...recommendations[1],
+      personalTryOnGenerations: [
+        {
+          status: "FAILED",
+          imageUrl: null,
+          error: "EvoLink personal try-on failed: 401 - raw provider detail",
+          attemptCount: 3,
+          prompt: "secret-prompt-two",
+          promptCompilerVersion: 1,
+          imageObjectKey: null,
+          provider: "evolink",
+        },
+      ],
+    } as (typeof recommendations)[number];
+    recommendations[2] = {
+      ...recommendations[2],
+      personalTryOnGenerations: [],
+    } as (typeof recommendations)[number];
+    vi.mocked(prisma.styleDiagnosis.findUnique).mockResolvedValue(
+      makeDiagnosis({ recommendations }) as unknown as Awaited<
+        ReturnType<typeof prisma.styleDiagnosis.findUnique>
+      >
+    );
+
+    const result = await getDiagnosisDetailForViewer({
+      diagnosisId: "diag-1",
+      userId: "user-1",
+      anonymousSessionId: null,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("unexpected failure");
+    expect(result.diagnosis.recommendations[0].personalTryOn).toEqual({
+      status: "COMPLETED",
+      imageUrl: "https://r2.example/personal.png",
+      errorCode: null,
+      attemptCount: 2,
+    });
+    expect(result.diagnosis.recommendations[1].personalTryOn).toEqual({
+      status: "FAILED",
+      imageUrl: null,
+      errorCode: "PERSONAL_TRY_ON_PROVIDER_FAILED",
+      attemptCount: 3,
+    });
+    expect(result.diagnosis.recommendations[2].personalTryOn).toBeNull();
+    const serialized = JSON.stringify(result.diagnosis);
+    expect(serialized).not.toContain("secret-prompt");
+    expect(serialized).not.toContain("personal-try-on/secret-key");
+    expect(serialized).not.toContain("raw provider detail");
+    expect(serialized).not.toContain("promptCompilerVersion");
   });
 });

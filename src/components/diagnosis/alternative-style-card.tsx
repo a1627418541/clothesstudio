@@ -2,6 +2,11 @@ import { EditorialLabel } from "@/components/ui/editorial-label";
 import { ReportRecommendation } from "@/types/diagnosis";
 import { ColorPalette } from "./color-palette";
 import { MarketplaceProductGrid } from "./marketplace-product-grid";
+import {
+  LEGACY_TRY_ON_DISCLOSURE,
+  PERSONAL_TRY_ON_DISCLOSURE,
+  resolvePersonalTryOnView,
+} from "./personal-try-on-view";
 import { RecommendationItems } from "./recommendation-items";
 import { RecommendationMeta } from "./recommendation-meta";
 import { StylePreviewImage } from "./style-preview-image";
@@ -23,25 +28,32 @@ export function AlternativeStyleCard({
   onGenerateTryOn = () => undefined,
 }: AlternativeStyleCardProps) {
   const directionNumber = String(rank + 1).padStart(2, "0");
+  const personalTryOnView = resolvePersonalTryOnView(recommendation);
 
   return (
     <article className="border border-[var(--line)] bg-[var(--surface)]">
       <div className="border-b border-[var(--line)] p-6">
         <StylePreviewImage
-          status={
-            recommendation.tryOnImageStatus === "COMPLETED" || recommendation.tryOnImageUrl
-              ? "COMPLETED"
-              : recommendation.previewImageStatus
-          }
-          url={recommendation.tryOnImageUrl ?? recommendation.previewImageUrl}
+          status={recommendation.previewImageStatus}
+          url={recommendation.previewImageUrl}
           title={recommendation.title}
           aspect="3/4"
-          disclosure={
-            recommendation.tryOnImageUrl
-              ? "本人试穿为 AI 生成效果，仅供搭配参考"
-              : null
-          }
         />
+        {personalTryOnView.kind === "completed" ? (
+          <div className="mt-4">
+            <StylePreviewImage
+              status="COMPLETED"
+              url={personalTryOnView.imageUrl}
+              title={`${recommendation.title} 本人试穿`}
+              aspect="3/4"
+              disclosure={
+                personalTryOnView.legacy
+                  ? LEGACY_TRY_ON_DISCLOSURE
+                  : PERSONAL_TRY_ON_DISCLOSURE
+              }
+            />
+          </div>
+        ) : null}
         <TryOnStatusPanel
           recommendation={recommendation}
           faceTryOnConsent={faceTryOnConsent}

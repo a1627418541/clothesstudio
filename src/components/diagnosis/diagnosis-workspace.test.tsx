@@ -40,13 +40,22 @@ describe("diagnosis workspace", () => {
 
     expect(source).toContain("/try-on-consent");
     expect(source).toContain("JSON.stringify({ consent: true, deleteGenerated: false })");
-    expect(source).toContain("/recommendations/${recommendationId}/try-on");
+    expect(source).toContain("postPersonalTryOn({");
+    expect(source).not.toContain("/recommendations/${recommendationId}/try-on`");
     const consentIndex = source.indexOf("const consentResponse");
     const refreshIndex = source.indexOf("await fetchDiagnosis();", consentIndex);
-    const requestIndex = source.indexOf("/recommendations/${recommendationId}/try-on", consentIndex);
+    const requestIndex = source.indexOf("postPersonalTryOn({", consentIndex);
     expect(consentIndex).toBeGreaterThan(-1);
     expect(refreshIndex).toBeGreaterThan(consentIndex);
     expect(requestIndex).toBeGreaterThan(refreshIndex);
     expect(source).toContain("onGenerateTryOn={() => void requestTryOn(recommendation.id)}");
+
+    const requestSource = readFileSync(
+      resolve("src/lib/personal-try-on/personal-try-on-request.ts"),
+      "utf8"
+    );
+    expect(requestSource).toContain(
+      "/recommendations/${input.recommendationId}/personal-try-on"
+    );
   });
 });
