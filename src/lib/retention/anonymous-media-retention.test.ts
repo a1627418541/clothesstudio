@@ -4,7 +4,9 @@ import { cleanupExpiredAnonymousMedia } from "./anonymous-media-retention";
 function createClient(diagnoses: unknown[]) {
   return {
     styleDiagnosis: {
-      findMany: vi.fn().mockResolvedValue(diagnoses),
+      findMany: vi.fn().mockResolvedValue(
+        diagnoses.map((d) => ({ personalTryOnGenerations: [], ...(d as any) }))
+      ),
       update: vi.fn().mockResolvedValue({}),
     },
     mediaAsset: {
@@ -15,6 +17,9 @@ function createClient(diagnoses: unknown[]) {
     },
     styleRecommendation: {
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
+    personalTryOnGeneration: {
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
   };
 }
@@ -194,4 +199,46 @@ describe("anonymous media retention", () => {
     });
     expect(result.diagnosesExpired).toBe(1);
   });
+
+  it("deletes personal try-on objects and rows for expired anonymous diagnoses", async () => {
+    vi.stubEnv("CLOUDFLARE_R2_BUCKET_NAME", "clthoesstudio");
+    const deleteObject = vi.fn().mockResolvedValue(undefined);
+    const client = {
+      styleDiagnosis: {
+        findMany: vi.fn().mockResolvedValue([
+          {
+            id: "d1",
+            photos: [],
+            recommendations: [],
+            personalTryOnGenerations: [
+              { id: "gen-1", imageObjectKey: "personal-try-on/rec-1.png" },
+            ],
+          },
+        ]),
+        update: vi.fn().mockResolvedValue({}),
+      },
+      mediaAsset: { update: vi.fn() },
+      diagnosisPhoto: { count: vi.fn().mockResolvedValue(0) },
+      styleRecommendation: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      personalTryOnGeneration: {
+        deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
+      },
+    };
+
+    const result = await cleanupExpiredAnonymousMedia({
+      client: client as any,
+      deleteObject,
+      now: new Date("2026-08-22T00:00:00.000Z"),
+    });
+
+    expect(deleteObject).toHaveBeenCalledWith({
+      bucket: "clthoesstudio",
+      key: "personal-try-on/rec-1.png",
+    });
+    expect(client.personalTryOnGeneration.deleteMany).toHaveBeenCalledWith({
+      where: { diagnosisId: "d1" },
+    });
+    expect(result.diagnosesExpired).toBe(1);
+  });
 });
+
