@@ -192,15 +192,28 @@ async function persistCompleted(
   now: () => Date
 ): Promise<void> {
   await input.client.$transaction(async (tx) => {
+    const existing = await tx.styleRecommendation.findUnique({
+      where: { id: input.recommendation.id },
+      select: { tryOnImageUrl: true },
+    });
+    const hasExistingTryOn = existing?.tryOnImageUrl != null;
+    const tryOnUrl = hasExistingTryOn
+      ? existing.tryOnImageUrl
+      : (result.tryOnUrl ?? null);
+
     await tx.styleRecommendation.update({
       where: { id: input.recommendation.id },
       data: {
         previewImageStatus: "COMPLETED",
         previewImageUrl: result.url,
         previewImageError: null,
-        tryOnImageStatus: result.tryOnUrl ? "COMPLETED" : "PENDING",
-        tryOnImageUrl: result.tryOnUrl ?? null,
-        tryOnImageError: null,
+        ...(hasExistingTryOn
+          ? {}
+          : {
+              tryOnImageStatus: tryOnUrl ? "COMPLETED" : "PENDING",
+              tryOnImageUrl: tryOnUrl,
+              tryOnImageError: null,
+            }),
       },
     });
     await tx.aiJob.update({

@@ -98,8 +98,8 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     const categories = new Set(
       recommendation.products.map((product) => product.category)
     );
-    const completeProducts = ["TOP", "BOTTOM", "HAT"].every((category) =>
-      categories.has(category as "TOP" | "BOTTOM" | "HAT")
+    const completeProducts = ["TOP", "BOTTOM"].every((category) =>
+      categories.has(category as "TOP" | "BOTTOM")
     );
     const productPlanReady =
       recommendation.productPlanStatus === "READY" &&

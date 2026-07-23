@@ -24,7 +24,6 @@ import { POST } from "./route";
 const products = [
   { category: "TOP", imageUrl: "https://assets.example/top.jpg" },
   { category: "BOTTOM", imageUrl: "https://assets.example/bottom.jpg" },
-  { category: "HAT", imageUrl: "https://assets.example/hat.jpg" },
 ];
 
 function diagnosis(overrides: Record<string, unknown> = {}) {

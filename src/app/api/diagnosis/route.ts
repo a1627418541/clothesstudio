@@ -10,7 +10,6 @@ import {
   buildRecommendationPlan,
 } from "@/lib/style-archetype/recommendation-plan";
 import { persistRecommendationPlan } from "@/lib/style-archetype/recommendation-persistence";
-import { createMockProductProvider } from "@/lib/marketplace/mock-product-provider";
 import { matchOutfitProductPlans } from "@/lib/marketplace/outfit-product-matcher";
 import {
   hashProductSnapshots,
@@ -216,10 +215,6 @@ export async function POST(request: NextRequest) {
     try {
       productPlans = await matchOutfitProductPlans({
         budgetTier,
-        providers: [
-          createMockProductProvider("TAOBAO"),
-          createMockProductProvider("JD"),
-        ],
         recommendations: savedRecommendations.map((recommendation) => ({
           rank: recommendation.rank,
           title: recommendation.title,

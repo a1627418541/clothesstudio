@@ -15,8 +15,8 @@ const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1_000;
 
 function hasCompleteRequiredProducts(input: RunTryOnWorkflowInput): boolean {
   const categories = new Set(input.products.map((product) => product.category));
-  return ["TOP", "BOTTOM", "HAT"].every((category) =>
-    categories.has(category as "TOP" | "BOTTOM" | "HAT")
+  return ["TOP", "BOTTOM"].every((category) =>
+    categories.has(category as "TOP" | "BOTTOM")
   );
 }
 
@@ -89,15 +89,14 @@ export async function runTryOnWorkflow(
   const garmentProducts = input.products
     .filter(
       (product): product is typeof product & { category: TryOnGarmentCategory } =>
-        product.category !== "HAT"
+        ["TOP", "BOTTOM", "OUTERWEAR"].includes(product.category)
     )
     .sort(
       (left, right) =>
         GARMENT_ORDER.indexOf(left.category) -
         GARMENT_ORDER.indexOf(right.category)
     );
-  const hat = input.products.find((product) => product.category === "HAT")!;
-  const productImageUrls = [...garmentProducts, hat].map(
+  const productImageUrls = garmentProducts.map(
     (product) => product.imageUrl
   );
 
@@ -119,19 +118,6 @@ export async function runTryOnWorkflow(
         });
         composedImageUrl = result.imageUrl;
       }
-
-      const hatStatusUpdated = await dependencies.persistence.setStatus(
-        input.recommendationId,
-        "APPLYING_HAT"
-      );
-      if (!hatStatusUpdated) {
-        return { status: "CANCELLED", reason: "CONSENT_REVOKED" };
-      }
-      const hatResult = await dependencies.virtualTryOn.applyHat({
-        personImageUrl: composedImageUrl,
-        productImageUrl: hat.imageUrl,
-      });
-      composedImageUrl = hatResult.imageUrl;
 
       const consentBeforeIdentity = await dependencies.persistence.readConsent(
         input.diagnosisId
