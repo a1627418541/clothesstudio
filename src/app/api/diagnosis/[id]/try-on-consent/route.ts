@@ -53,6 +53,14 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     }
 
     const now = new Date();
+    const generations =
+      !parsed.data.consent && parsed.data.deleteGenerated
+        ? await prisma.personalTryOnGeneration.findMany({
+            where: { diagnosisId: id },
+            select: { imageObjectKey: true },
+          })
+        : [];
+
     await prisma.$transaction(async (tx) => {
       if (parsed.data.consent) {
         await tx.styleDiagnosis.update({
@@ -104,28 +112,27 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
             tryOnExpiresAt: null,
           },
         });
-        const generations = await tx.personalTryOnGeneration.findMany({
-          where: { diagnosisId: id },
-          select: { imageObjectKey: true },
-        });
-        for (const generation of generations) {
-          if (!generation.imageObjectKey) continue;
-          try {
-            await deleteObjectFromR2({
-              bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME!,
-              key: generation.imageObjectKey,
-            });
-          } catch {
-            console.error(
-              "Try-on consent warning: PERSONAL_TRY_ON_R2_DELETE_FAILED"
-            );
-          }
-        }
         await tx.personalTryOnGeneration.deleteMany({
           where: { diagnosisId: id },
         });
       }
     });
+
+    if (!parsed.data.consent && parsed.data.deleteGenerated) {
+      for (const generation of generations) {
+        if (!generation.imageObjectKey) continue;
+        try {
+          await deleteObjectFromR2({
+            bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME!,
+            key: generation.imageObjectKey,
+          });
+        } catch {
+          console.error(
+            "Try-on consent warning: PERSONAL_TRY_ON_R2_DELETE_FAILED"
+          );
+        }
+      }
+    }
 
     return NextResponse.json({
       ok: true,

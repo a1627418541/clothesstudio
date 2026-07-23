@@ -23,6 +23,7 @@ vi.mock("@/lib/r2", () => ({
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     styleDiagnosis: { findUnique: mocks.findDiagnosis },
+    personalTryOnGeneration: { findMany: mocks.findPersonalTryOns },
     $transaction: mocks.transaction,
   },
 }));
@@ -69,7 +70,6 @@ describe("POST try-on consent", () => {
         styleDiagnosis: { update: mocks.updateDiagnosis },
         styleRecommendation: { updateMany: mocks.updateRecommendations },
         personalTryOnGeneration: {
-          findMany: mocks.findPersonalTryOns,
           deleteMany: mocks.deletePersonalTryOns,
         },
       })
@@ -169,6 +169,10 @@ describe("POST try-on consent", () => {
       where: { diagnosisId: "diag-1" },
       select: { imageObjectKey: true },
     });
+    expect(mocks.findPersonalTryOns).toHaveBeenCalledBefore(mocks.transaction);
+    expect(mocks.deletePersonalTryOns).toHaveBeenCalledWith({
+      where: { diagnosisId: "diag-1" },
+    });
     expect(mocks.deleteObjectFromR2).toHaveBeenCalledWith({
       bucket: "test-bucket",
       key: "personal/key-1.png",
@@ -177,9 +181,7 @@ describe("POST try-on consent", () => {
       bucket: "test-bucket",
       key: "personal/key-2.png",
     });
-    expect(mocks.deletePersonalTryOns).toHaveBeenCalledWith({
-      where: { diagnosisId: "diag-1" },
-    });
+    expect(mocks.deleteObjectFromR2).toHaveBeenCalledAfter(mocks.deletePersonalTryOns);
   });
 
   it("skips R2 deletion for personal try-on rows without an imageObjectKey", async () => {
