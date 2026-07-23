@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { Prisma } from "@prisma/client";
+import { Prisma, PersonalTryOnGeneration } from "@prisma/client";
 import { runPersonalTryOnGeneration } from "./personal-try-on-service";
 import { V2_ARCHETYPE_MANIFEST } from "@/lib/style-archetype/archetype-v2-manifest";
 import { buildV2RecommendationSnapshot } from "@/lib/style-archetype/recommendation-snapshot";
+import { PersonalTryOnGenerationDependencies } from "./personal-try-on-service";
 
 const snapshot = buildV2RecommendationSnapshot({
   archetype: V2_ARCHETYPE_MANIFEST.find((a) => a.slug === "old-money")!,
@@ -58,17 +59,28 @@ function makeDependencies(overrides: Record<string, unknown> = {}) {
   };
 }
 
+const personalTryOnGeneration = (partial: {
+  id: string;
+  status: string;
+  attemptCount: number;
+}): PersonalTryOnGeneration => partial as unknown as PersonalTryOnGeneration;
+
 describe("runPersonalTryOnGeneration", () => {
   it("creates a new generation and completes", async () => {
     const deps = makeDependencies();
     deps.client.personalTryOnGeneration.findUnique.mockResolvedValue(null);
-    deps.client.personalTryOnGeneration.create.mockResolvedValue({
-      id: "gen-1",
-      status: "PROCESSING",
-      attemptCount: 1,
-    });
+    deps.client.personalTryOnGeneration.create.mockResolvedValue(
+      personalTryOnGeneration({
+        id: "gen-1",
+        status: "PROCESSING",
+        attemptCount: 1,
+      })
+    );
 
-    const result = await runPersonalTryOnGeneration(baseInput, deps as any);
+    const result = await runPersonalTryOnGeneration(
+      baseInput,
+      deps as unknown as PersonalTryOnGenerationDependencies
+    );
 
     expect(result.status).toBe("COMPLETED");
     expect(deps.provider.generate).toHaveBeenCalledWith({
@@ -90,15 +102,22 @@ describe("runPersonalTryOnGeneration", () => {
 
   it("claims an existing PENDING generation with exact CAS", async () => {
     const deps = makeDependencies();
-    deps.client.personalTryOnGeneration.findUnique.mockResolvedValue({
-      id: "gen-1",
-      status: "PENDING",
-      attemptCount: 0,
-    });
+    deps.client.personalTryOnGeneration.findUnique.mockResolvedValue(
+      personalTryOnGeneration({
+        id: "gen-1",
+        status: "PENDING",
+        attemptCount: 0,
+      })
+    );
     deps.client.personalTryOnGeneration.updateMany.mockResolvedValue({ count: 1 });
-    deps.client.personalTryOnGeneration.update.mockResolvedValue({});
+    deps.client.personalTryOnGeneration.update.mockResolvedValue(
+      personalTryOnGeneration({ id: "gen-1", status: "PROCESSING", attemptCount: 1 })
+    );
 
-    const result = await runPersonalTryOnGeneration(baseInput, deps as any);
+    const result = await runPersonalTryOnGeneration(
+      baseInput,
+      deps as unknown as PersonalTryOnGenerationDependencies
+    );
 
     expect(deps.client.personalTryOnGeneration.updateMany).toHaveBeenCalledWith({
       where: { id: "gen-1", status: "PENDING" },
@@ -109,13 +128,18 @@ describe("runPersonalTryOnGeneration", () => {
 
   it("rejects when attempt cap is reached", async () => {
     const deps = makeDependencies();
-    deps.client.personalTryOnGeneration.findUnique.mockResolvedValue({
-      id: "gen-1",
-      status: "FAILED",
-      attemptCount: 3,
-    });
+    deps.client.personalTryOnGeneration.findUnique.mockResolvedValue(
+      personalTryOnGeneration({
+        id: "gen-1",
+        status: "FAILED",
+        attemptCount: 3,
+      })
+    );
 
-    const result = await runPersonalTryOnGeneration(baseInput, deps as any);
+    const result = await runPersonalTryOnGeneration(
+      baseInput,
+      deps as unknown as PersonalTryOnGenerationDependencies
+    );
 
     expect(result.status).toBe("FAILED");
     if (result.status === "FAILED") {
@@ -129,7 +153,7 @@ describe("runPersonalTryOnGeneration", () => {
 
     const result = await runPersonalTryOnGeneration(
       { ...baseInput, userId: null, anonymousSessionId: null },
-      deps as any
+      deps as unknown as PersonalTryOnGenerationDependencies
     );
 
     expect(result.status).toBe("FAILED");
@@ -144,7 +168,7 @@ describe("runPersonalTryOnGeneration", () => {
 
     const result = await runPersonalTryOnGeneration(
       { ...baseInput, userId: "user-1", anonymousSessionId: "session-1" },
-      deps as any
+      deps as unknown as PersonalTryOnGenerationDependencies
     );
 
     expect(result.status).toBe("FAILED");
@@ -156,15 +180,22 @@ describe("runPersonalTryOnGeneration", () => {
 
   it("claims and retries a FAILED generation with CAS", async () => {
     const deps = makeDependencies();
-    deps.client.personalTryOnGeneration.findUnique.mockResolvedValue({
-      id: "gen-1",
-      status: "FAILED",
-      attemptCount: 1,
-    });
+    deps.client.personalTryOnGeneration.findUnique.mockResolvedValue(
+      personalTryOnGeneration({
+        id: "gen-1",
+        status: "FAILED",
+        attemptCount: 1,
+      })
+    );
     deps.client.personalTryOnGeneration.updateMany.mockResolvedValue({ count: 1 });
-    deps.client.personalTryOnGeneration.update.mockResolvedValue({});
+    deps.client.personalTryOnGeneration.update.mockResolvedValue(
+      personalTryOnGeneration({ id: "gen-1", status: "PROCESSING", attemptCount: 2 })
+    );
 
-    const result = await runPersonalTryOnGeneration(baseInput, deps as any);
+    const result = await runPersonalTryOnGeneration(
+      baseInput,
+      deps as unknown as PersonalTryOnGenerationDependencies
+    );
 
     expect(deps.client.personalTryOnGeneration.updateMany).toHaveBeenCalledWith({
       where: { id: "gen-1", status: "FAILED" },
@@ -183,7 +214,10 @@ describe("runPersonalTryOnGeneration", () => {
       })
     );
 
-    const result = await runPersonalTryOnGeneration(baseInput, deps as any);
+    const result = await runPersonalTryOnGeneration(
+      baseInput,
+      deps as unknown as PersonalTryOnGenerationDependencies
+    );
 
     expect(result.status).toBe("FAILED");
     if (result.status === "FAILED") {

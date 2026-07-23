@@ -18,7 +18,7 @@ interface RetentionPersonalTryOnGeneration {
   imageObjectKey: string | null;
 }
 
-interface RetentionDiagnosis {
+export interface RetentionDiagnosis {
   id: string;
   photos: Array<{ mediaAsset: RetentionMediaAsset }>;
   recommendations: RetentionRecommendation[];

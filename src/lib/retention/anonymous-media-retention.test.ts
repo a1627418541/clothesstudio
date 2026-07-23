@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanupExpiredAnonymousMedia } from "./anonymous-media-retention";
+import { cleanupExpiredAnonymousMedia, AnonymousMediaRetentionClient, RetentionDiagnosis } from "./anonymous-media-retention";
 
-function createClient(diagnoses: unknown[]) {
+function createClient(diagnoses: Array<Omit<RetentionDiagnosis, "personalTryOnGenerations">>) {
   return {
     styleDiagnosis: {
       findMany: vi.fn().mockResolvedValue(
-        diagnoses.map((d) => ({ personalTryOnGenerations: [], ...(d as any) }))
+        diagnoses.map((d): RetentionDiagnosis => ({ personalTryOnGenerations: [], ...d }))
       ),
       update: vi.fn().mockResolvedValue({}),
     },
@@ -226,7 +226,7 @@ describe("anonymous media retention", () => {
     };
 
     const result = await cleanupExpiredAnonymousMedia({
-      client: client as any,
+      client: client as unknown as AnonymousMediaRetentionClient,
       deleteObject,
       now: new Date("2026-08-22T00:00:00.000Z"),
     });
