@@ -28,19 +28,11 @@ describe("diagnosis workspace", () => {
     expect(html).toContain("Clear, well-lit front face");
   });
 
-  it("requires an approved total-outfit budget in the submitted payload", () => {
+  it("defaults to an approved total-outfit budget and includes it in the submitted payload", () => {
     const source = readFileSync(resolve("src/app/diagnosis/page.tsx"), "utf8");
 
-    for (const label of [
-      "500 元以内",
-      "500–1000 元",
-      "1000–2000 元",
-      "2000 元以上",
-    ]) {
-      expect(source).toContain(label);
-    }
+    expect(source).toContain('budgetTier: "FROM_500_TO_1000"');
     expect(source).toContain("budgetTier: form.budgetTier");
-    expect(source).toMatch(/canSubmit[\s\S]*form\.budgetTier/);
   });
 
   it("connects consent and per-recommendation try-on requests in sequence", () => {

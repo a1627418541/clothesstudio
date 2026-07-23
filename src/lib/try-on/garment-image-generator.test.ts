@@ -3,6 +3,7 @@ import {
   generateGarmentImage,
   generateGarmentImagesForPlan,
   type GenerateGarmentImageInput,
+  type ProductWithGeneratedImage,
 } from "./garment-image-generator";
 import type { StylePreviewImageProvider } from "@/lib/ai/style-preview-image-provider";
 import type { OutfitProductPlan } from "@/lib/marketplace/outfit-product-matcher";
@@ -195,7 +196,11 @@ describe("generateGarmentImagesForPlan", () => {
     const result = await generateGarmentImagesForPlan(plan, { dependencies: deps });
 
     expect(result.products).toHaveLength(3);
-    expect(result.products.every((p) => p.generatedImageUrl === "https://r2.example.com/garment.png")).toBe(true);
+    expect(
+      (result.products as ProductWithGeneratedImage[]).every(
+        (p) => p.generatedImageUrl === "https://r2.example.com/garment.png"
+      )
+    ).toBe(true);
   });
 
   it("throws when any garment fails to generate", async () => {

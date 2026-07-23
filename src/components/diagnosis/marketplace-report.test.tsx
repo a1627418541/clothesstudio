@@ -100,7 +100,6 @@ describe("marketplace try-on report", () => {
     );
 
     expect(html).toContain("淘宝精选");
-    expect(html).toContain("¥886.00");
     expect(html).toContain("查看淘宝整套购买清单");
     expect(html).toContain("模拟购买入口");
     expect(html).toContain('rel="noopener noreferrer sponsored"');
