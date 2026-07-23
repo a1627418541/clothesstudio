@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { Prisma } from "@prisma/client";
 import { runPersonalTryOnGeneration } from "./personal-try-on-service";
 import { V2_ARCHETYPE_MANIFEST } from "@/lib/style-archetype/archetype-v2-manifest";
 import { buildV2RecommendationSnapshot } from "@/lib/style-archetype/recommendation-snapshot";
@@ -119,6 +120,74 @@ describe("runPersonalTryOnGeneration", () => {
     expect(result.status).toBe("FAILED");
     if (result.status === "FAILED") {
       expect(result.error).toBe("ATTEMPT_CAP_REACHED");
+    }
+    expect(deps.provider.generate).not.toHaveBeenCalled();
+  });
+
+  it("fails XOR validation when both owner identifiers are null", async () => {
+    const deps = makeDependencies();
+
+    const result = await runPersonalTryOnGeneration(
+      { ...baseInput, userId: null, anonymousSessionId: null },
+      deps as any
+    );
+
+    expect(result.status).toBe("FAILED");
+    if (result.status === "FAILED") {
+      expect(result.error).toBe("OWNER_REQUIRED");
+    }
+    expect(deps.provider.generate).not.toHaveBeenCalled();
+  });
+
+  it("fails XOR validation when both owner identifiers are present", async () => {
+    const deps = makeDependencies();
+
+    const result = await runPersonalTryOnGeneration(
+      { ...baseInput, userId: "user-1", anonymousSessionId: "session-1" },
+      deps as any
+    );
+
+    expect(result.status).toBe("FAILED");
+    if (result.status === "FAILED") {
+      expect(result.error).toBe("OWNER_AMBIGUOUS");
+    }
+    expect(deps.provider.generate).not.toHaveBeenCalled();
+  });
+
+  it("claims and retries a FAILED generation with CAS", async () => {
+    const deps = makeDependencies();
+    deps.client.personalTryOnGeneration.findUnique.mockResolvedValue({
+      id: "gen-1",
+      status: "FAILED",
+      attemptCount: 1,
+    });
+    deps.client.personalTryOnGeneration.updateMany.mockResolvedValue({ count: 1 });
+    deps.client.personalTryOnGeneration.update.mockResolvedValue({});
+
+    const result = await runPersonalTryOnGeneration(baseInput, deps as any);
+
+    expect(deps.client.personalTryOnGeneration.updateMany).toHaveBeenCalledWith({
+      where: { id: "gen-1", status: "FAILED" },
+      data: { status: "PROCESSING", attemptCount: { increment: 1 } },
+    });
+    expect(result.status).toBe("COMPLETED");
+  });
+
+  it("fails with GENERATION_ALREADY_CLAIMED when create races on unique key", async () => {
+    const deps = makeDependencies();
+    deps.client.personalTryOnGeneration.findUnique.mockResolvedValue(null);
+    deps.client.personalTryOnGeneration.create.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
+        code: "P2002",
+        clientVersion: "test",
+      })
+    );
+
+    const result = await runPersonalTryOnGeneration(baseInput, deps as any);
+
+    expect(result.status).toBe("FAILED");
+    if (result.status === "FAILED") {
+      expect(result.error).toBe("GENERATION_ALREADY_CLAIMED");
     }
     expect(deps.provider.generate).not.toHaveBeenCalled();
   });
