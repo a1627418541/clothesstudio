@@ -3,6 +3,7 @@ import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { getAnonymousSessionByToken } from "@/lib/anonymous-session";
 import { prisma } from "@/lib/prisma";
+import { deleteObjectFromR2 } from "@/lib/r2";
 
 const consentBodySchema = z.object({
   consent: z.boolean(),
@@ -102,6 +103,26 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
             productFidelityScore: null,
             tryOnExpiresAt: null,
           },
+        });
+        const generations = await tx.personalTryOnGeneration.findMany({
+          where: { diagnosisId: id },
+          select: { imageObjectKey: true },
+        });
+        for (const generation of generations) {
+          if (!generation.imageObjectKey) continue;
+          try {
+            await deleteObjectFromR2({
+              bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME!,
+              key: generation.imageObjectKey,
+            });
+          } catch {
+            console.error(
+              "Try-on consent warning: PERSONAL_TRY_ON_R2_DELETE_FAILED"
+            );
+          }
+        }
+        await tx.personalTryOnGeneration.deleteMany({
+          where: { diagnosisId: id },
         });
       }
     });

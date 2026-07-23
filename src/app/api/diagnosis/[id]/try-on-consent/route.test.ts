@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   auth: vi.fn(),
@@ -7,12 +7,18 @@ const mocks = vi.hoisted(() => ({
   findDiagnosis: vi.fn(),
   updateDiagnosis: vi.fn(),
   updateRecommendations: vi.fn(),
+  findPersonalTryOns: vi.fn(),
+  deletePersonalTryOns: vi.fn(),
+  deleteObjectFromR2: vi.fn(),
   transaction: vi.fn(),
 }));
 
 vi.mock("@/lib/auth", () => ({ auth: mocks.auth }));
 vi.mock("@/lib/anonymous-session", () => ({
   getAnonymousSessionByToken: mocks.getAnonymousSessionByToken,
+}));
+vi.mock("@/lib/r2", () => ({
+  deleteObjectFromR2: mocks.deleteObjectFromR2,
 }));
 vi.mock("@/lib/prisma", () => ({
   prisma: {
@@ -37,8 +43,13 @@ function request(body: unknown) {
 const context = { params: Promise.resolve({ id: "diag-1" }) };
 
 describe("POST try-on consent", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv("CLOUDFLARE_R2_BUCKET_NAME", "test-bucket");
     mocks.auth.mockResolvedValue({ user: { id: "user-1" } });
     mocks.findDiagnosis.mockResolvedValue({
       id: "diag-1",
@@ -47,10 +58,20 @@ describe("POST try-on consent", () => {
     });
     mocks.updateDiagnosis.mockResolvedValue({ id: "diag-1" });
     mocks.updateRecommendations.mockResolvedValue({ count: 3 });
+    mocks.findPersonalTryOns.mockResolvedValue([
+      { imageObjectKey: "personal/key-1.png" },
+      { imageObjectKey: "personal/key-2.png" },
+    ]);
+    mocks.deletePersonalTryOns.mockResolvedValue({ count: 2 });
+    mocks.deleteObjectFromR2.mockResolvedValue(undefined);
     mocks.transaction.mockImplementation(async (operation) =>
       operation({
         styleDiagnosis: { update: mocks.updateDiagnosis },
         styleRecommendation: { updateMany: mocks.updateRecommendations },
+        personalTryOnGeneration: {
+          findMany: mocks.findPersonalTryOns,
+          deleteMany: mocks.deletePersonalTryOns,
+        },
       })
     );
   });
@@ -134,6 +155,73 @@ describe("POST try-on consent", () => {
     expect(errorSpy).toHaveBeenCalledWith(
       "Try-on consent error: CONSENT_UPDATE_FAILED"
     );
+    errorSpy.mockRestore();
+  });
+
+  it("deletes personal try-on R2 objects and rows when revoking consent with deleteGenerated", async () => {
+    const response = await POST(
+      request({ consent: false, deleteGenerated: true }),
+      context
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.findPersonalTryOns).toHaveBeenCalledWith({
+      where: { diagnosisId: "diag-1" },
+      select: { imageObjectKey: true },
+    });
+    expect(mocks.deleteObjectFromR2).toHaveBeenCalledWith({
+      bucket: "test-bucket",
+      key: "personal/key-1.png",
+    });
+    expect(mocks.deleteObjectFromR2).toHaveBeenCalledWith({
+      bucket: "test-bucket",
+      key: "personal/key-2.png",
+    });
+    expect(mocks.deletePersonalTryOns).toHaveBeenCalledWith({
+      where: { diagnosisId: "diag-1" },
+    });
+  });
+
+  it("skips R2 deletion for personal try-on rows without an imageObjectKey", async () => {
+    mocks.findPersonalTryOns.mockResolvedValue([
+      { imageObjectKey: "personal/key-1.png" },
+      { imageObjectKey: null },
+    ]);
+
+    const response = await POST(
+      request({ consent: false, deleteGenerated: true }),
+      context
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.deleteObjectFromR2).toHaveBeenCalledTimes(1);
+    expect(mocks.deleteObjectFromR2).toHaveBeenCalledWith({
+      bucket: "test-bucket",
+      key: "personal/key-1.png",
+    });
+    expect(mocks.deletePersonalTryOns).toHaveBeenCalledWith({
+      where: { diagnosisId: "diag-1" },
+    });
+  });
+
+  it("continues cleanup and logs no URLs when R2 deletion fails", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    mocks.deleteObjectFromR2.mockRejectedValueOnce(
+      new Error("r2://private-bucket/secret.png?token=storage-token")
+    );
+
+    const response = await POST(
+      request({ consent: false, deleteGenerated: true }),
+      context
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.deletePersonalTryOns).toHaveBeenCalledWith({
+      where: { diagnosisId: "diag-1" },
+    });
+    const errorLog = JSON.stringify(errorSpy.mock.calls);
+    expect(errorLog).not.toContain("storage-token");
+    expect(errorLog).not.toContain("private-bucket");
     errorSpy.mockRestore();
   });
 });
