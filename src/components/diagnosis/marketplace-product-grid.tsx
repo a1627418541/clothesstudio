@@ -12,11 +12,6 @@ const CATEGORY_LABELS = {
   HAT: "帽子",
 } as const;
 
-const CNY = new Intl.NumberFormat("zh-CN", {
-  style: "currency",
-  currency: "CNY",
-});
-
 function isMockPurchaseUrl(url: string) {
   try {
     return new URL(url).hostname === "example.invalid";
@@ -42,21 +37,11 @@ export function MarketplaceProductGrid({
 
   return (
     <section className="mt-8 border-t border-[var(--line)] pt-7" aria-label="推荐实际单品">
-      <div className="flex items-end justify-between gap-6">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--oxblood)]">
-            {platformLabel}
-          </p>
-          <h3 className="mt-2 font-editorial text-3xl font-medium text-[var(--ink)]">本套实际单品</h3>
-        </div>
-        {recommendation.productTotalCents !== null ? (
-          <div className="text-right">
-            <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--muted-ink)]">快照合计</p>
-            <p className="mt-1 font-editorial text-3xl text-[var(--ink)]">
-              {CNY.format(recommendation.productTotalCents / 100)}
-            </p>
-          </div>
-        ) : null}
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--oxblood)]">
+          {platformLabel}
+        </p>
+        <h3 className="mt-2 font-editorial text-3xl font-medium text-[var(--ink)]">本套实际单品</h3>
       </div>
 
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -74,15 +59,10 @@ export function MarketplaceProductGrid({
                 className="aspect-square h-[84px] w-[84px] object-cover"
               />
               <div className="min-w-0">
-                <div className="flex items-start justify-between gap-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--oxblood)]">
-                    {CATEGORY_LABELS[product.category]}
-                    {product.isOptional ? " · 可选" : ""}
-                  </p>
-                  <p className="shrink-0 text-sm font-semibold text-[var(--ink)]">
-                    {CNY.format(product.priceCents / 100)}
-                  </p>
-                </div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--oxblood)]">
+                  {CATEGORY_LABELS[product.category]}
+                  {product.isOptional ? " · 可选" : ""}
+                </p>
                 <h4 className="mt-1 line-clamp-2 text-sm font-semibold leading-5 text-[var(--ink)]">{product.title}</h4>
                 <p className="mt-1 truncate text-xs text-[var(--muted-ink)]">
                   {product.variantLabel} · {product.sellerName}
@@ -117,9 +97,6 @@ export function MarketplaceProductGrid({
           {collectionIsMock ? "模拟购买入口 · " : ""}查看{platform === "TAOBAO" ? "淘宝" : "京东"}整套购买清单
         </a>
       ) : null}
-      <p className="mt-3 text-[11px] leading-5 text-[var(--muted-ink)]">
-        商品、价格与库存为生成报告时的快照，跳转后请以平台实时页面为准。
-      </p>
     </section>
   );
 }

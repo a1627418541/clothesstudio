@@ -13,10 +13,16 @@ interface RetentionRecommendation {
   tryOnImageUrl: string | null;
 }
 
-interface RetentionDiagnosis {
+interface RetentionPersonalTryOnGeneration {
+  id: string;
+  imageObjectKey: string | null;
+}
+
+export interface RetentionDiagnosis {
   id: string;
   photos: Array<{ mediaAsset: RetentionMediaAsset }>;
   recommendations: RetentionRecommendation[];
+  personalTryOnGenerations: RetentionPersonalTryOnGeneration[];
 }
 
 interface FindManyArgs {
@@ -30,6 +36,9 @@ interface FindManyArgs {
     photos: { include: { mediaAsset: true } };
     recommendations: {
       select: { id: true; tryOnImageUrl: true };
+    };
+    personalTryOnGenerations: {
+      select: { id: true; imageObjectKey: true };
     };
   };
 }
@@ -81,6 +90,11 @@ export interface AnonymousMediaRetentionClient {
       };
     }): Promise<unknown>;
   };
+  personalTryOnGeneration: {
+    deleteMany(args: {
+      where: { diagnosisId: string };
+    }): Promise<unknown>;
+  };
 }
 
 export type AnonymousMediaCleanupError =
@@ -88,6 +102,10 @@ export type AnonymousMediaCleanupError =
   | {
       recommendationId: string;
       errorCode: "R2_DELETE_FAILED" | "R2_KEY_UNRESOLVED";
+    }
+  | {
+      personalTryOnGenerationId: string;
+      errorCode: "R2_DELETE_FAILED";
     };
 
 export interface AnonymousMediaCleanupResult {
@@ -145,6 +163,9 @@ export async function cleanupExpiredAnonymousMedia(input: {
       photos: { include: { mediaAsset: true } },
       recommendations: {
         select: { id: true, tryOnImageUrl: true },
+      },
+      personalTryOnGenerations: {
+        select: { id: true, imageObjectKey: true },
       },
     },
   });
@@ -232,8 +253,30 @@ export async function cleanupExpiredAnonymousMedia(input: {
       }
     }
 
+    const bucket = process.env.CLOUDFLARE_R2_BUCKET_NAME?.trim();
+    for (const generation of diagnosis.personalTryOnGenerations) {
+      if (!generation.imageObjectKey || !bucket) continue;
+      const object = { bucket, key: generation.imageObjectKey };
+      const objectId = `${object.bucket}/${object.key}`;
+      if (deletedObjects.has(objectId)) continue;
+      try {
+        await input.deleteObject(object);
+        deletedObjects.add(objectId);
+        result.objectsDeleted += 1;
+      } catch {
+        allObjectsSucceeded = false;
+        result.errors.push({
+          personalTryOnGenerationId: generation.id,
+          errorCode: "R2_DELETE_FAILED",
+        });
+      }
+    }
+
     if (!allObjectsSucceeded) continue;
 
+    await input.client.personalTryOnGeneration.deleteMany({
+      where: { diagnosisId: diagnosis.id },
+    });
     await input.client.styleRecommendation.updateMany({
       where: { diagnosisId: diagnosis.id },
       data: {

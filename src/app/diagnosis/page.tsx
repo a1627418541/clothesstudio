@@ -54,7 +54,7 @@ export default function DiagnosisPage() {
     age: "",
     heightCm: "",
     weightKg: "",
-    budgetTier: "",
+    budgetTier: "FROM_500_TO_1000",
     faceTryOnConsent: false,
   });
 
@@ -380,40 +380,6 @@ export default function DiagnosisPage() {
                     {formErrors.weightKg ? <p id="weight-error" className="mt-2 text-sm text-[var(--error)]">{formErrors.weightKg}</p> : null}
                   </div>
                 </div>
-
-                <fieldset className="mt-7 border-t border-[var(--line)] pt-6">
-                  <legend className="pr-4 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink)]">
-                    整套商品预算
-                  </legend>
-                  <p className="mt-2 text-xs leading-5 text-[var(--muted-ink)]">
-                    我们会按这个预算推荐淘宝或京东可购买的实际单品。
-                  </p>
-                  <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                    {[
-                      { value: "UNDER_500", label: "500 元以内" },
-                      { value: "FROM_500_TO_1000", label: "500–1000 元" },
-                      { value: "FROM_1000_TO_2000", label: "1000–2000 元" },
-                      { value: "ABOVE_2000", label: "2000 元以上" },
-                    ].map((option) => (
-                      <button
-                        key={option.value}
-                        type="button"
-                        onClick={() => setForm({ ...form, budgetTier: option.value })}
-                        className={[
-                          "min-h-12 border px-3 text-sm font-semibold transition-colors",
-                          form.budgetTier === option.value
-                            ? "border-[var(--oxblood)] bg-[#f7ecee] text-[var(--oxblood)]"
-                            : "border-[var(--line)] text-[var(--ink)] hover:border-[var(--oxblood)]",
-                        ].join(" ")}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                  </div>
-                  {formErrors.budgetTier ? (
-                    <p className="mt-2 text-sm text-[var(--error)]">{formErrors.budgetTier}</p>
-                  ) : null}
-                </fieldset>
 
                 <div className="mt-6 border border-[var(--line)] bg-[var(--paper)] p-5">
                   <label className="flex items-start gap-3 cursor-pointer">

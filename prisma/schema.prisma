@@ -205,6 +205,7 @@ model StyleDiagnosis {
   recommendations StyleRecommendation[]
   generatedImages GeneratedImage[]
   aiJobs          AiJob[]
+  personalTryOnGenerations PersonalTryOnGeneration[]
 
   deletedAt DateTime?
   createdAt DateTime @default(now())
@@ -404,6 +405,8 @@ model StyleRecommendation {
   archetypeSnapshot Json?
   matchScore        Int?
 
+  personalTryOnGenerations PersonalTryOnGeneration[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -504,6 +507,33 @@ model GeneratedImage {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// Personal virtual try-on generation per recommendation
+model PersonalTryOnGeneration {
+  id                    String   @id @default(cuid())
+  recommendationId      String   @unique
+  recommendation        StyleRecommendation @relation(fields: [recommendationId], references: [id], onDelete: Cascade)
+
+  diagnosisId           String
+  diagnosis             StyleDiagnosis @relation(fields: [diagnosisId], references: [id], onDelete: Cascade)
+
+  userId                String?
+  anonymousSessionId    String?
+
+  status                ImageStatus @default(PENDING)
+  prompt                String?     @db.Text
+  promptCompilerVersion Int?
+  imageUrl              String?
+  imageObjectKey        String?
+  provider              String?
+  error                 String?
+  attemptCount          Int         @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([diagnosisId])
 }
 
 // Prompt versions

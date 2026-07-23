@@ -269,7 +269,7 @@ export async function POST(request: NextRequest) {
             }
           });
 
-          await runTryOnWorkflow({
+          const tryOnResult = await runTryOnWorkflow({
             diagnosisId: diagnosis.id,
             recommendationId: primary.id,
             trigger: "AUTO_PRIMARY",
@@ -286,7 +286,11 @@ export async function POST(request: NextRequest) {
             diagnosisCreatedAt: diagnosis.createdAt,
             isAnonymous: !diagnosis.userId,
           });
-        } catch {
+          if (tryOnResult.status !== "COMPLETED") {
+            throw new Error(`Auto try-on skipped: ${tryOnResult.reason}`);
+          }
+        } catch (error) {
+          console.error("Auto try-on failed:", error instanceof Error ? error.message : String(error));
           try {
             await prisma.styleRecommendation.update({
               where: { id: primary.id },
