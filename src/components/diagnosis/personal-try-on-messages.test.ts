@@ -15,6 +15,8 @@ describe("personalTryOnErrorMessage", () => {
     expect(personalTryOnErrorMessage("PERSONAL_TRY_ON_PROVIDER_FAILED")).toBe("生成服务暂时不可用，请稍后重试");
     expect(personalTryOnErrorMessage("PERSONAL_TRY_ON_STORAGE_FAILED")).toBe("图片保存失败，请稍后重试");
     expect(personalTryOnErrorMessage("PERSONAL_TRY_ON_REQUEST_FAILED")).toBe("系统繁忙，请稍后重试");
+    expect(personalTryOnErrorMessage("FULL_BODY_IMAGE_TOO_SMALL")).toBe("全身照距离过远或清晰度不足。请上传人物占画面较大、头到脚完整可见的正面全身照。");
+    expect(personalTryOnErrorMessage("FULL_BODY_IMAGE_UNREADABLE")).toBe("全身照读取失败，请重新上传后再试。");
   });
 
   it("falls back to generic copy for unknown codes and never echoes raw provider errors", () => {

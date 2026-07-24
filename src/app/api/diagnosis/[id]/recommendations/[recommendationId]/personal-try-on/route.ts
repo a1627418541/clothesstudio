@@ -4,6 +4,7 @@ import { getAnonymousSessionByToken } from "@/lib/anonymous-session";
 import { prisma } from "@/lib/prisma";
 import { validateV2RecommendationSnapshot } from "@/lib/style-archetype/recommendation-snapshot";
 import { runPersonalTryOnGeneration } from "@/lib/personal-try-on/personal-try-on-service";
+import { checkFullBodyImageSize } from "@/lib/personal-try-on/full-body-image-check";
 import { evolinkPersonalTryOnProvider } from "@/lib/ai/evolink-personal-try-on-provider";
 import { mockPersonalTryOnProvider } from "@/lib/ai/mock-personal-try-on-provider";
 import { buildProviderImageInput } from "@/lib/personal-try-on/provider-image-input";
@@ -89,6 +90,16 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     const bodyPhoto = diagnosis.photos.find((photo) => photo.role === "FULL_BODY");
     if (!facePhoto?.mediaAsset || !bodyPhoto?.mediaAsset) {
       return NextResponse.json({ error: "REQUIRED_PHOTOS_NOT_READY" }, { status: 409 });
+    }
+
+    // Hard input gate: blocks only generation/regeneration. Report reads,
+    // existing image display, consent withdrawal, and retention are unaffected.
+    const fullBodyCheck = await checkFullBodyImageSize({
+      bucket: bodyPhoto.mediaAsset.bucket,
+      key: bodyPhoto.mediaAsset.key,
+    });
+    if (!fullBodyCheck.ok) {
+      return NextResponse.json({ error: fullBodyCheck.code }, { status: 409 });
     }
 
     const result = await runPersonalTryOnGeneration(
