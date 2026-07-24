@@ -14,6 +14,8 @@
 - No automatic retries and no batch regeneration; every cost-bearing call traces to a user action or its direct continuation.
 - Logs and errors never contain image URLs, signed URLs, base64, object keys, tokens, or provider raw responses — stable codes only.
 - All automated tests use mocks only; no real EvoLink/Replicate calls, no real cost.
+- Every real-cost call (Phases 0A, 0B, 10) requires a separate, explicit user budget approval before execution; no other phase may incur provider cost.
+- Real test photos, generated outputs, and full provider responses must never be committed to Git or written to logs; acceptance records contain only ids, statuses, durations, and scores.
 - Mock passthrough must never emit formal restoration-success semantics (§Phase 2).
 - Production feature flags default off: `PERSONAL_TRY_ON_FACE_RESTORE_ENABLED=false`, `FACE_RESTORE_PROVIDER=mock`.
 - Face source is always the diagnosis's own consented FACE_FRONT asset resolved server-side; no client-supplied faces, no third-party/celebrity entry.
@@ -51,7 +53,7 @@ No code changes. Real EvoLink calls only after user approves budget (5 calls max
 - [ ] **Step 2: Generate 5 base images.** Same user, same recommendation or across recommendations on one diagnosis; use the deployed PR #19 build (Preview or production alias). Each run records: generation id, EvoLink task id, compilerVersion (=2), attemptCount, wall time, safe result status.
 - [ ] **Step 3: EvoLink dashboard cross-check.** For each of the 5 task ids, confirm the task consumed BOTH references (full-body + front-face). If any task shows no reference consumption, stop — the `image_urls` fix is not effective; return to provider debugging before any acceptance scoring.
 - [ ] **Step 4: Human review per image** against: visual height, shoulder width, body proportions, torso length, leg length, original pose, framing/composition, background, hairstyle, outfit fidelity, and "turned into a stranger-model body" (fail flag).
-- [ ] **Step 5: Record results** in a score table (real outputs only — tests, prompts, or request bodies never substitute). ≥4/5 pass → proceed to 0C; otherwise → 0C No-Go path.
+- [ ] **Step 5: Record results** in a standalone report `docs/superpowers/reviews/<date>-phase0a-base-image-acceptance.md` (score table, generation ids, task ids, dashboard confirmations, wall times, safe statuses — real outputs only; no images or URLs in the report or the repo). ≥4/5 pass → proceed to 0C; otherwise → 0C No-Go path.
 
 ## Phase 0B — Face Restore Provider Verification
 
@@ -72,14 +74,14 @@ Per candidate, verify and record:
 - Output URL lifetime (Replicate: ~1h auto-delete, already documented).
 - Vercel reachability from our deployment region.
 
-Deliverable: a comparison record and a nominated provider (or "none acceptable" → 0C No-Go).
+Deliverable: a standalone comparison report `docs/superpowers/reviews/<date>-phase0b-face-restore-provider-verification.md` and a nominated provider (or "none acceptable" → 0C No-Go).
 
 ## Phase 0C — Go / No-Go Decision
 
 - [ ] **Step 1:** Assemble Phase 0A score table + Phase 0B comparison + per-try-on cost estimate (base + restore).
-- [ ] **Step 2:** User decision, recorded in `.superpowers/sdd/progress.md`:
+- [ ] **Step 2:** User decision, recorded as a standalone decision record `docs/superpowers/reviews/<date>-phase0c-go-no-go.md` and in `.superpowers/sdd/progress.md`:
   - **Go** = provider passed AND ≥4/5 body acceptance AND cost approved → unlock Phase 1, create `codex/personal-try-on-face-identity` per the baseline rule.
-  - **No-Go** (any condition fails) = stop Option 2; write the Option 3 evaluation report (dedicated VTON + face restoration, incl. `TENCENT_CLOUD_*` provisioning and re-benchmark plan) as the deliverable; no business implementation is written.
+  - **No-Go** = any condition fails **or no explicit written Go exists** → this plan terminates: Phases 1–12 are not executed, no migration is run, no business implementation is written; the only follow-up deliverable is the Option 3 evaluation report `docs/superpowers/reviews/<date>-option3-vton-face-restore-evaluation.md`.
 
 ---
 
@@ -103,7 +105,7 @@ Deliverable: a comparison record and a nominated provider (or "none acceptable" 
 | `faceRestoreAttemptCount` | `Int` | `@default(0)` | restore-stage attempts (cap 2) |
 | `faceRestoreStartedAt` | `DateTime?` | null | set on successful restore claim; the ONLY age source for staleness (never `updatedAt`) |
 
-`imageUrl`/`imageObjectKey` semantics: feature flag OFF or legacy rows → single-stage result (unchanged); flag ON → current display image (base until restore completes, then final).
+`imageUrl`/`imageObjectKey` semantics: feature flag OFF or legacy rows → single-stage result (unchanged); flag ON → current display image (base until restore completes, then final). `baseImageUrl`/`baseImageObjectKey` permanently reference the base image of the current generation cycle — written once at base success and replaced only when a NEW base is produced by `REGENERATE_COMPLETED`; restore outcomes never overwrite them. Consumers must never interpret `imageUrl` as a final personal try-on without the interpreter's `displayKind="FINAL"` (Phase 6).
 
 - [ ] **Step 1: Failing test** — extend the schema test to assert every column above exists with the expected nullability/default.
 - [ ] **Step 2:** Run `npx vitest run src/lib/personal-try-on/personal-try-on-generation-schema.test.ts` → FAIL (columns missing).
@@ -140,7 +142,7 @@ export interface FaceRestoreProvider {
 }
 ```
 
-Mock rules (hard requirements): controllable outcomes per test; mock passthrough NEVER returns `SUCCEEDED` with a "restored" result claiming formal identity success — the test mock may only simulate success when a test explicitly programs it; the factory's default/unconfigured branch returns a provider whose `start` fails with `FACE_RESTORE_NOT_CONFIGURED` (used when flag off or `FACE_RESTORE_PROVIDER` unset), so production can never silently fake restoration.
+Mock rules (hard requirements): controllable outcomes per test; mock passthrough NEVER returns `SUCCEEDED` with a "restored" result claiming formal identity success — the test mock may only simulate success when a test explicitly programs it; the factory's default/unconfigured branch returns a provider whose `start` fails with `FACE_RESTORE_NOT_CONFIGURED` (used when flag off or `FACE_RESTORE_PROVIDER` unset), so production can never silently fake restoration. In production wiring, the unconfigured/mock path can never write `faceRestoreStatus=COMPLETED`: formal completion is reachable only through a real provider's SUCCEEDED check.
 
 - [ ] **Step 1: Failing tests** — interface conformance; mock programmed outcomes (PROCESSING → SUCCEEDED/FAILED); factory: `FACE_RESTORE_PROVIDER=replicate` + flag on → replicate; anything else → unconfigured provider (`FACE_RESTORE_NOT_CONFIGURED`).
 - [ ] **Step 2:** Run → FAIL (modules missing).
@@ -181,7 +183,9 @@ Changes:
 1. **Stage-1 completion write** (inside existing `runPersonalTryOnGeneration` success path, behind flag): on base success persist `baseImageUrl/baseImageObjectKey` + `faceRestoreStatus="PENDING"` (+ `faceRestoreProvider` unset) in the same atomic update that writes the display image; flag OFF → write nothing new (legacy semantics).
 2. **`startFaceRestore(input, deps)`**: requires row `status=COMPLETED` and `faceRestoreStatus ∈ {PENDING, FAILED}`; exact CAS → `faceRestoreStatus=PROCESSING`, `faceRestoreAttemptCount` increment only when coming from FAILED (RETRY) — first start from PENDING does not consume the retry cap (cap 2 applies to retries); call `provider.start`, persist `faceRestoreTaskId` + `faceRestoreStartedAt=now` + `faceRestoreProvider=name`; taskId persist failure → row to `faceRestoreStatus=FAILED` (`FACE_RESTORE_PROVIDER_FAILED`), orphan prediction is cost-only; stale pre-check: if already PROCESSING and `faceRestoreStartedAt` older than 24h → first run the stale transition (below), then evaluate claimability.
 3. **`pollFaceRestore(input, deps)`**: requires PROCESSING + taskId; **stale rule executed here (real DB transition)**: PROCESSING && `faceRestoreStartedAt < now-24h` → write `faceRestoreStatus=FAILED`, `faceRestoreError="FACE_RESTORE_TASK_LOST"`, keep base display (no DB side effects in the DTO formatter — see Phase 6). Otherwise call `provider.check`: PROCESSING → return current state; SUCCEEDED → download + store final to R2 (`personal-try-on/restored/…`) → atomic persist display `imageUrl/imageObjectKey`=final, `faceRestoreStatus=COMPLETED`, error=null (CAS-guarded idempotency: only when still PROCESSING); FAILED → `faceRestoreStatus=FAILED` + safe code; task lost at provider → `FACE_RESTORE_TASK_LOST` as above. Poll is read-only except these guarded transitions.
-4. **Attempt/cost invariants:** restore never increments base `attemptCount`; `faceRestoreAttemptCount` cap 2 for retries; no automatic retries anywhere.
+4. **Replacement ordering (strict, applies to final images and to base regeneration alike):** store the new final object to R2 → atomic DB switch (display `imageUrl/imageObjectKey`=final, `faceRestoreStatus=COMPLETED`) → only after the commit succeeds, best-effort delete the superseded object (only when keys differ) → if the DB switch fails, best-effort delete the NEW orphan and keep the old display. Neither `REGENERATE_COMPLETED` nor `RETRY_FACE_RESTORE` may delete the previous successful final before its replacement is fully persisted.
+5. **Stale reconcile helper:** `reconcileStaleFaceRestore(row, now)` — the single shared transition used by both `pollFaceRestore` and the report-read trigger (Phase 6): PROCESSING && `faceRestoreStartedAt < now-24h` → write `faceRestoreStatus=FAILED`, `faceRestoreError="FACE_RESTORE_TASK_LOST"`, keep base display; idempotent via CAS on still-PROCESSING.
+6. **Attempt/cost invariants:** restore never increments base `attemptCount`; `faceRestoreAttemptCount` cap 2 for retries; no automatic retries anywhere.
 
 - [ ] **Step 1: Failing tests** — stage-1 writes restore fields (flag on) and omits them (flag off); start CAS from PENDING and from FAILED; start rejected from PROCESSING/COMPLETED-restore; poll success → final persisted (display=final, deletion/ordering rules); poll PROCESSING → no writes; poll FAILED; stale 24h transition in poll (not on read); retry cap 2; base attemptCount untouched by restore.
 - [ ] **Step 2:** Run → FAIL.
@@ -240,7 +244,9 @@ export function derivePersonalTryOnStage(input: {
 }
 ```
 
-Formal completion requires `status=COMPLETED && faceRestoreStatus=COMPLETED && imageUrl present && displayKind=FINAL`. Stale (>24h PROCESSING) is derived as `restoreStale=true` and displayed as `FACE_RESTORE_FAILED`/`FACE_RESTORE_TASK_LOST` **without** mutating the DB (real transition only in Phase 4 poll).
+Formal completion requires `status=COMPLETED && faceRestoreStatus=COMPLETED && imageUrl present && displayKind=FINAL`. Stale (>24h PROCESSING) is derived as `restoreStale=true` and displayed as `FACE_RESTORE_FAILED`/`FACE_RESTORE_TASK_LOST` **without** mutating the DB inside the pure interpreter.
+
+**Stale conversion trigger:** the report READ path (`getDiagnosisDetailForViewer` — already a DB-touching service, NOT the pure formatter) fires exactly one idempotent `reconcileStaleFaceRestore` (Phase 4) per stale row before mapping, so a plain report view converges the DB to FAILED. The pure formatter/interpreter itself stays side-effect free; CAS idempotency makes duplicate triggers no-ops.
 
 **Search-and-replace list (every raw `personalTryOn.status` judgment migrates to the interpreter):**
 - `src/lib/diagnosis-service.ts` — `toPersonalTryOnState` → emit interpreter output (safe fields only).
