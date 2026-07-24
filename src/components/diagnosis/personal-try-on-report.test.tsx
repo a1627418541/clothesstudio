@@ -179,4 +179,55 @@ describe("personal try-on report slots", () => {
     expect(html).toContain("本人试穿生成中");
     expect(html).not.toContain("生成这套试穿");
   });
+
+  it("offers an explicit regenerate action on a completed personal try-on", () => {
+    const html = renderPrimary(
+      v2Recommendation({
+        personalTryOn: {
+          status: "COMPLETED",
+          imageUrl: "https://r2.example/personal.png",
+          errorCode: null,
+          attemptCount: 1,
+        },
+      })
+    );
+
+    expect(html).toContain("https://r2.example/personal.png");
+    expect(html).toContain("重新生成改进版");
+  });
+
+  it("keeps showing the previous image while regenerating", () => {
+    const html = renderPrimary(
+      v2Recommendation({
+        personalTryOn: {
+          status: "PROCESSING",
+          imageUrl: "https://r2.example/previous.png",
+          errorCode: null,
+          attemptCount: 2,
+        },
+      })
+    );
+
+    expect(html).toContain("https://r2.example/previous.png");
+    expect(html).toContain("改进版生成中");
+    expect(html).not.toContain("重新生成改进版");
+    expect(html).not.toContain(">生成本人试穿<");
+  });
+
+  it("keeps the previous image with a safe message when a regeneration fails", () => {
+    const html = renderPrimary(
+      v2Recommendation({
+        personalTryOn: {
+          status: "FAILED",
+          imageUrl: "https://r2.example/previous.png",
+          errorCode: "PERSONAL_TRY_ON_PROVIDER_FAILED",
+          attemptCount: 2,
+        },
+      })
+    );
+
+    expect(html).toContain("https://r2.example/previous.png");
+    expect(html).toContain("改进版生成失败，当前仍展示上一版结果。");
+    expect(html).toContain("重新生成改进版");
+  });
 });

@@ -137,14 +137,20 @@ export default function DiagnosisDetailPage() {
           await fetchDiagnosis();
         }
 
-        const retry =
+        const currentStatus =
           diagnosis?.recommendations.find(
             (recommendation) => recommendation.id === recommendationId
-          )?.personalTryOn?.status === "FAILED";
+          )?.personalTryOn?.status ?? null;
+        const action =
+          currentStatus === "FAILED"
+            ? "RETRY_FAILED"
+            : currentStatus === "COMPLETED"
+              ? "REGENERATE_COMPLETED"
+              : "GENERATE";
         const result = await postPersonalTryOn({
           diagnosisId: id,
           recommendationId,
-          retry,
+          action,
         });
         if (!result.ok) {
           setTryOnRequestError(personalTryOnErrorMessage(result.errorCode));

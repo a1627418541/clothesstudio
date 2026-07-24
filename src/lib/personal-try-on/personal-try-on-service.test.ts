@@ -22,6 +22,7 @@ const baseInput = {
   recommendationId: "rec-1",
   userId: "user-1",
   anonymousSessionId: null,
+  action: "GENERATE" as const,
   snapshot,
   fullBody: { bucket: "bucket", key: "uploads/body.jpg" },
   frontFace: { bucket: "bucket", key: "uploads/face.jpg" },
@@ -31,7 +32,13 @@ function makeDependencies(overrides: Record<string, unknown> = {}) {
   return {
     provider: {
       name: "mock",
-      generate: vi.fn(async () => ({
+      generate: vi.fn<
+        () => Promise<{
+          url: string | null;
+          base64?: string | null;
+          error?: string | null;
+        }>
+      >(async () => ({
         url: "https://provider.example/result.png",
         base64: null,
         error: null,
@@ -39,6 +46,7 @@ function makeDependencies(overrides: Record<string, unknown> = {}) {
     },
     storeImage: vi.fn(async () => ({ url: "https://r2.example/stored.png" })),
     buildImageInput: vi.fn(async () => ({ kind: "signed-url", value: "https://signed.example/img.jpg" })),
+    deleteObject: vi.fn<(input: { key: string }) => Promise<void>>(async () => undefined),
     client: {
       personalTryOnGeneration: {
         findUnique: vi.fn(),
@@ -63,6 +71,8 @@ const personalTryOnGeneration = (partial: {
   id: string;
   status: string;
   attemptCount: number;
+  imageObjectKey?: string | null;
+  imageUrl?: string | null;
 }): PersonalTryOnGeneration => partial as unknown as PersonalTryOnGeneration;
 
 describe("runPersonalTryOnGeneration", () => {
@@ -121,7 +131,11 @@ describe("runPersonalTryOnGeneration", () => {
 
     expect(deps.client.personalTryOnGeneration.updateMany).toHaveBeenCalledWith({
       where: { id: "gen-1", status: "PENDING" },
-      data: { status: "PROCESSING", attemptCount: { increment: 1 } },
+      data: expect.objectContaining({
+        status: "PROCESSING",
+        attemptCount: { increment: 1 },
+        promptCompilerVersion: 2,
+      }),
     });
     expect(result.status).toBe("COMPLETED");
   });
@@ -193,13 +207,17 @@ describe("runPersonalTryOnGeneration", () => {
     );
 
     const result = await runPersonalTryOnGeneration(
-      baseInput,
+      { ...baseInput, action: "RETRY_FAILED" },
       deps as unknown as PersonalTryOnGenerationDependencies
     );
 
     expect(deps.client.personalTryOnGeneration.updateMany).toHaveBeenCalledWith({
       where: { id: "gen-1", status: "FAILED" },
-      data: { status: "PROCESSING", attemptCount: { increment: 1 } },
+      data: expect.objectContaining({
+        status: "PROCESSING",
+        attemptCount: { increment: 1 },
+        promptCompilerVersion: 2,
+      }),
     });
     expect(result.status).toBe("COMPLETED");
   });
@@ -224,5 +242,201 @@ describe("runPersonalTryOnGeneration", () => {
       expect(result.error).toBe("GENERATION_ALREADY_CLAIMED");
     }
     expect(deps.provider.generate).not.toHaveBeenCalled();
+  });
+
+  it("regenerates a COMPLETED generation with exact-status CAS and deletes the old object after commit", async () => {
+    const deps = makeDependencies();
+    deps.client.personalTryOnGeneration.findUnique.mockResolvedValue(
+      personalTryOnGeneration({
+        id: "gen-1",
+        status: "COMPLETED",
+        attemptCount: 1,
+        imageObjectKey: "personal-try-on/old.png",
+        imageUrl: "https://r2.example/old.png",
+      })
+    );
+    deps.client.personalTryOnGeneration.updateMany.mockResolvedValue({ count: 1 });
+    deps.client.personalTryOnGeneration.update.mockResolvedValue({});
+
+    const result = await runPersonalTryOnGeneration(
+      { ...baseInput, action: "REGENERATE_COMPLETED" },
+      deps as unknown as PersonalTryOnGenerationDependencies
+    );
+
+    expect(deps.client.personalTryOnGeneration.updateMany).toHaveBeenCalledWith({
+      where: { id: "gen-1", status: "COMPLETED" },
+      data: expect.objectContaining({
+        status: "PROCESSING",
+        attemptCount: { increment: 1 },
+        promptCompilerVersion: 2,
+      }),
+    });
+    expect(result.status).toBe("COMPLETED");
+    expect(deps.deleteObject).toHaveBeenCalledTimes(1);
+    expect(deps.deleteObject).toHaveBeenCalledWith({ key: "personal-try-on/old.png" });
+    const persistOrder =
+      deps.client.personalTryOnGeneration.update.mock.invocationCallOrder[0];
+    const deleteOrder = deps.deleteObject.mock.invocationCallOrder[0];
+    expect(persistOrder).toBeLessThan(deleteOrder);
+  });
+
+  it("rejects REGENERATE_COMPLETED on a FAILED row with an exact status match", async () => {
+    const deps = makeDependencies();
+    deps.client.personalTryOnGeneration.findUnique.mockResolvedValue(
+      personalTryOnGeneration({ id: "gen-1", status: "FAILED", attemptCount: 1 })
+    );
+
+    const result = await runPersonalTryOnGeneration(
+      { ...baseInput, action: "REGENERATE_COMPLETED" },
+      deps as unknown as PersonalTryOnGenerationDependencies
+    );
+
+    expect(result.status).toBe("FAILED");
+    if (result.status === "FAILED") {
+      expect(result.error).toBe("GENERATION_NOT_CLAIMABLE");
+    }
+    expect(deps.client.personalTryOnGeneration.updateMany).not.toHaveBeenCalled();
+    expect(deps.provider.generate).not.toHaveBeenCalled();
+  });
+
+  it("rejects RETRY_FAILED on a COMPLETED row with an exact status match", async () => {
+    const deps = makeDependencies();
+    deps.client.personalTryOnGeneration.findUnique.mockResolvedValue(
+      personalTryOnGeneration({ id: "gen-1", status: "COMPLETED", attemptCount: 1 })
+    );
+
+    const result = await runPersonalTryOnGeneration(
+      { ...baseInput, action: "RETRY_FAILED" },
+      deps as unknown as PersonalTryOnGenerationDependencies
+    );
+
+    expect(result.status).toBe("FAILED");
+    if (result.status === "FAILED") {
+      expect(result.error).toBe("GENERATION_NOT_CLAIMABLE");
+    }
+    expect(deps.provider.generate).not.toHaveBeenCalled();
+  });
+
+  it("rejects RETRY_FAILED when no generation exists", async () => {
+    const deps = makeDependencies();
+    deps.client.personalTryOnGeneration.findUnique.mockResolvedValue(null);
+
+    const result = await runPersonalTryOnGeneration(
+      { ...baseInput, action: "RETRY_FAILED" },
+      deps as unknown as PersonalTryOnGenerationDependencies
+    );
+
+    expect(result.status).toBe("FAILED");
+    if (result.status === "FAILED") {
+      expect(result.error).toBe("GENERATION_NOT_CLAIMABLE");
+    }
+    expect(deps.client.personalTryOnGeneration.create).not.toHaveBeenCalled();
+    expect(deps.provider.generate).not.toHaveBeenCalled();
+  });
+
+  it("rejects GENERATE on a COMPLETED row with an exact status match", async () => {
+    const deps = makeDependencies();
+    deps.client.personalTryOnGeneration.findUnique.mockResolvedValue(
+      personalTryOnGeneration({ id: "gen-1", status: "COMPLETED", attemptCount: 1 })
+    );
+
+    const result = await runPersonalTryOnGeneration(
+      baseInput,
+      deps as unknown as PersonalTryOnGenerationDependencies
+    );
+
+    expect(result.status).toBe("FAILED");
+    if (result.status === "FAILED") {
+      expect(result.error).toBe("GENERATION_NOT_CLAIMABLE");
+    }
+    expect(deps.provider.generate).not.toHaveBeenCalled();
+  });
+
+  it("keeps the previous image untouched when a regeneration fails", async () => {
+    const deps = makeDependencies();
+    deps.provider.generate.mockResolvedValue({ url: null, base64: null, error: "boom" });
+    deps.client.personalTryOnGeneration.findUnique.mockResolvedValue(
+      personalTryOnGeneration({
+        id: "gen-1",
+        status: "COMPLETED",
+        attemptCount: 1,
+        imageObjectKey: "personal-try-on/old.png",
+        imageUrl: "https://r2.example/old.png",
+      })
+    );
+    deps.client.personalTryOnGeneration.updateMany.mockResolvedValue({ count: 1 });
+    deps.client.personalTryOnGeneration.update.mockResolvedValue({});
+
+    const result = await runPersonalTryOnGeneration(
+      { ...baseInput, action: "REGENERATE_COMPLETED" },
+      deps as unknown as PersonalTryOnGenerationDependencies
+    );
+
+    expect(result.status).toBe("FAILED");
+    const failureUpdate = deps.client.personalTryOnGeneration.update.mock.calls[0][0];
+    expect(failureUpdate.where).toEqual({ id: "gen-1" });
+    expect(failureUpdate.data).toMatchObject({ status: "FAILED" });
+    expect(failureUpdate.data).not.toHaveProperty("imageUrl");
+    expect(failureUpdate.data).not.toHaveProperty("imageObjectKey");
+    expect(deps.deleteObject).not.toHaveBeenCalled();
+  });
+
+  it("cleans up the orphan new object and keeps the old one when the final persist fails", async () => {
+    const deps = makeDependencies();
+    deps.client.personalTryOnGeneration.findUnique.mockResolvedValue(
+      personalTryOnGeneration({
+        id: "gen-1",
+        status: "COMPLETED",
+        attemptCount: 1,
+        imageObjectKey: "personal-try-on/old.png",
+        imageUrl: "https://r2.example/old.png",
+      })
+    );
+    deps.client.personalTryOnGeneration.updateMany.mockResolvedValue({ count: 1 });
+    deps.client.personalTryOnGeneration.update
+      .mockRejectedValueOnce(new Error("db down"))
+      .mockResolvedValueOnce({});
+
+    const result = await runPersonalTryOnGeneration(
+      { ...baseInput, action: "REGENERATE_COMPLETED" },
+      deps as unknown as PersonalTryOnGenerationDependencies
+    );
+
+    expect(result.status).toBe("FAILED");
+    if (result.status === "FAILED") {
+      expect(result.error).toBe("PERSONAL_TRY_ON_STORAGE_FAILED");
+    }
+    expect(deps.provider.generate).toHaveBeenCalledTimes(1);
+    expect(deps.deleteObject).toHaveBeenCalledTimes(1);
+    const deletedKey = deps.deleteObject.mock.calls[0][0].key;
+    expect(deletedKey).toMatch(/^personal-try-on\//);
+    expect(deletedKey).not.toBe("personal-try-on/old.png");
+    expect(deps.client.personalTryOnGeneration.update).toHaveBeenLastCalledWith({
+      where: { id: "gen-1" },
+      data: expect.objectContaining({ status: "FAILED" }),
+    });
+  });
+
+  it("does not delete anything when a regenerated row had no previous object", async () => {
+    const deps = makeDependencies();
+    deps.client.personalTryOnGeneration.findUnique.mockResolvedValue(
+      personalTryOnGeneration({
+        id: "gen-1",
+        status: "COMPLETED",
+        attemptCount: 1,
+        imageObjectKey: null,
+        imageUrl: null,
+      })
+    );
+    deps.client.personalTryOnGeneration.updateMany.mockResolvedValue({ count: 1 });
+    deps.client.personalTryOnGeneration.update.mockResolvedValue({});
+
+    const result = await runPersonalTryOnGeneration(
+      { ...baseInput, action: "REGENERATE_COMPLETED" },
+      deps as unknown as PersonalTryOnGenerationDependencies
+    );
+
+    expect(result.status).toBe("COMPLETED");
+    expect(deps.deleteObject).not.toHaveBeenCalled();
   });
 });

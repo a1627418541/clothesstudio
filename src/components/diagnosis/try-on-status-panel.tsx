@@ -37,13 +37,19 @@ export function TryOnStatusPanel({
     !faceTryOnConsent &&
     (view.kind === "cta" || view.kind === "failed");
   const shouldOfferGenerate =
-    !shouldOfferAuthorize && (view.kind === "cta" || view.kind === "failed");
+    !shouldOfferAuthorize &&
+    (view.kind === "cta" ||
+      view.kind === "failed" ||
+      view.kind === "regeneration_failed" ||
+      view.kind === "completed");
   const actionLabel =
     view.kind === "failed"
       ? "重新生成本人试穿"
-      : isPrimary
-        ? "生成本人试穿"
-        : "生成这套试穿";
+      : view.kind === "regeneration_failed" || view.kind === "completed"
+        ? "重新生成改进版"
+        : isPrimary
+          ? "生成本人试穿"
+          : "生成这套试穿";
 
   const statusText = (() => {
     if (shouldOfferAuthorize) return "尚未授权本人试穿";
@@ -52,10 +58,14 @@ export function TryOnStatusPanel({
         return "准备生成";
       case "processing":
         return "本人试穿生成中";
+      case "regenerating":
+        return "改进版生成中";
       case "completed":
         return TRY_ON_STATUS_LABELS.COMPLETED;
       case "unavailable":
         return TRY_ON_STATUS_LABELS.FAILED;
+      case "regeneration_failed":
+        return "改进版生成失败，当前仍展示上一版结果。";
       case "failed":
         return recommendation.personalTryOn
           ? personalTryOnErrorMessage(view.errorCode)

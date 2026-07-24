@@ -39,7 +39,9 @@ export function AlternativeStyleCard({
           title={recommendation.title}
           aspect="3/4"
         />
-        {personalTryOnView.kind === "completed" ? (
+        {personalTryOnView.kind === "completed" ||
+        personalTryOnView.kind === "regenerating" ||
+        personalTryOnView.kind === "regeneration_failed" ? (
           <div className="mt-4">
             <StylePreviewImage
               status="COMPLETED"
@@ -47,7 +49,7 @@ export function AlternativeStyleCard({
               title={`${recommendation.title} 本人试穿`}
               aspect="3/4"
               disclosure={
-                personalTryOnView.legacy
+                personalTryOnView.kind === "completed" && personalTryOnView.legacy
                   ? LEGACY_TRY_ON_DISCLOSURE
                   : PERSONAL_TRY_ON_DISCLOSURE
               }

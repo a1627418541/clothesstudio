@@ -182,6 +182,50 @@ describe("POST /api/diagnosis/[id]/recommendations/[recommendationId]/personal-t
     expect(body.error).toBe("FULL_BODY_IMAGE_TOO_SMALL");
     expect(mocks.runPersonalTryOnGeneration).not.toHaveBeenCalled();
   });
+
+  it("rejects an unknown action with 400 before any service work", async () => {
+    mocks.prisma.styleDiagnosis.findUnique.mockResolvedValue(passingDiagnosis());
+    mocks.getAnonymousSessionByToken.mockResolvedValue({ id: "anon-1" });
+
+    const response = await POST(
+      makeRequestWithBody({ action: "DO_A_BARREL_ROLL" }, "aps_anonymous_session=token"),
+      { params }
+    );
+
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error).toBe("INVALID_PERSONAL_TRY_ON_ACTION");
+    expect(mocks.runPersonalTryOnGeneration).not.toHaveBeenCalled();
+  });
+
+  it("forwards an explicit REGENERATE_COMPLETED action to the service", async () => {
+    mocks.prisma.styleDiagnosis.findUnique.mockResolvedValue(passingDiagnosis());
+    mocks.getAnonymousSessionByToken.mockResolvedValue({ id: "anon-1" });
+
+    const response = await POST(
+      makeRequestWithBody({ action: "REGENERATE_COMPLETED" }, "aps_anonymous_session=token"),
+      { params }
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.runPersonalTryOnGeneration).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "REGENERATE_COMPLETED" }),
+      expect.any(Object)
+    );
+  });
+
+  it("defaults to GENERATE when no body is provided", async () => {
+    mocks.prisma.styleDiagnosis.findUnique.mockResolvedValue(passingDiagnosis());
+    mocks.getAnonymousSessionByToken.mockResolvedValue({ id: "anon-1" });
+
+    const response = await POST(makeRequest("aps_anonymous_session=token"), { params });
+
+    expect(response.status).toBe(200);
+    expect(mocks.runPersonalTryOnGeneration).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "GENERATE" }),
+      expect.any(Object)
+    );
+  });
 });
 
 describe("personal try-on route duration budget", () => {

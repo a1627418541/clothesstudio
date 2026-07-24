@@ -11,9 +11,11 @@ export type PersonalTryOnView =
   | { kind: "cta" }
   | { kind: "pending" }
   | { kind: "processing" }
+  | { kind: "regenerating"; imageUrl: string }
   | { kind: "completed"; imageUrl: string; legacy: boolean }
   | { kind: "unavailable" }
-  | { kind: "failed"; errorCode: string | null };
+  | { kind: "failed"; errorCode: string | null }
+  | { kind: "regeneration_failed"; errorCode: string | null; imageUrl: string };
 
 const LEGACY_IN_FLIGHT_STATUSES: ReadonlySet<ReportTryOnWorkflowStatus> =
   new Set([
@@ -39,13 +41,21 @@ export function resolvePersonalTryOnView(recommendation: {
       case "PENDING":
         return { kind: "pending" };
       case "PROCESSING":
-        return { kind: "processing" };
+        return generation.imageUrl
+          ? { kind: "regenerating", imageUrl: generation.imageUrl }
+          : { kind: "processing" };
       case "COMPLETED":
         return generation.imageUrl
           ? { kind: "completed", imageUrl: generation.imageUrl, legacy: false }
           : { kind: "unavailable" };
       case "FAILED":
-        return { kind: "failed", errorCode: generation.errorCode };
+        return generation.imageUrl
+          ? {
+              kind: "regeneration_failed",
+              errorCode: generation.errorCode,
+              imageUrl: generation.imageUrl,
+            }
+          : { kind: "failed", errorCode: generation.errorCode };
     }
   }
 

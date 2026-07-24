@@ -15,7 +15,7 @@ describe("postPersonalTryOn", () => {
   it("posts to the Sprint 3.9 personal-try-on endpoint, never the legacy /try-on", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(okResponse({ ok: true, result: { status: "COMPLETED" } }));
 
-    const result = await postPersonalTryOn({ ...input, retry: false, fetchImpl });
+    const result = await postPersonalTryOn({ ...input, action: "GENERATE", fetchImpl });
 
     expect(result).toEqual({ ok: true });
     expect(fetchImpl).toHaveBeenCalledTimes(1);
@@ -24,19 +24,30 @@ describe("postPersonalTryOn", () => {
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ retry: false }),
+        body: JSON.stringify({ action: "GENERATE" }),
       }
     );
   });
 
-  it("sends explicit retry semantics when regenerating a FAILED generation", async () => {
+  it("sends RETRY_FAILED semantics when regenerating a FAILED generation", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(okResponse({ ok: true, result: { status: "COMPLETED" } }));
 
-    await postPersonalTryOn({ ...input, retry: true, fetchImpl });
+    await postPersonalTryOn({ ...input, action: "RETRY_FAILED", fetchImpl });
 
     expect(fetchImpl).toHaveBeenCalledWith(
       "/api/diagnosis/d1/recommendations/r1/personal-try-on",
-      expect.objectContaining({ body: JSON.stringify({ retry: true }) })
+      expect.objectContaining({ body: JSON.stringify({ action: "RETRY_FAILED" }) })
+    );
+  });
+
+  it("sends REGENERATE_COMPLETED semantics when improving a COMPLETED generation", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(okResponse({ ok: true, result: { status: "COMPLETED" } }));
+
+    await postPersonalTryOn({ ...input, action: "REGENERATE_COMPLETED", fetchImpl });
+
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "/api/diagnosis/d1/recommendations/r1/personal-try-on",
+      expect.objectContaining({ body: JSON.stringify({ action: "REGENERATE_COMPLETED" }) })
     );
   });
 
@@ -45,7 +56,7 @@ describe("postPersonalTryOn", () => {
       errorResponse(409, { ok: false, error: "ATTEMPT_CAP_REACHED" })
     );
 
-    const result = await postPersonalTryOn({ ...input, retry: true, fetchImpl });
+    const result = await postPersonalTryOn({ ...input, action: "RETRY_FAILED", fetchImpl });
 
     expect(result).toEqual({ ok: false, errorCode: "ATTEMPT_CAP_REACHED" });
   });
@@ -55,7 +66,7 @@ describe("postPersonalTryOn", () => {
       errorResponse(500, { error: "PERSONAL_TRY_ON_REQUEST_FAILED" })
     );
 
-    const result = await postPersonalTryOn({ ...input, retry: false, fetchImpl });
+    const result = await postPersonalTryOn({ ...input, action: "GENERATE", fetchImpl });
 
     expect(result).toEqual({ ok: false, errorCode: "PERSONAL_TRY_ON_REQUEST_FAILED" });
   });
@@ -65,7 +76,7 @@ describe("postPersonalTryOn", () => {
       okResponse({ ok: false, error: "GENERATION_NOT_CLAIMABLE" })
     );
 
-    const result = await postPersonalTryOn({ ...input, retry: false, fetchImpl });
+    const result = await postPersonalTryOn({ ...input, action: "GENERATE", fetchImpl });
 
     expect(result).toEqual({ ok: false, errorCode: "GENERATION_NOT_CLAIMABLE" });
   });
@@ -79,7 +90,7 @@ describe("postPersonalTryOn", () => {
       },
     });
 
-    const result = await postPersonalTryOn({ ...input, retry: false, fetchImpl });
+    const result = await postPersonalTryOn({ ...input, action: "GENERATE", fetchImpl });
 
     expect(result).toEqual({ ok: false, errorCode: null });
   });
@@ -87,7 +98,7 @@ describe("postPersonalTryOn", () => {
   it("returns a null code on network failure without leaking internals", async () => {
     const fetchImpl = vi.fn().mockRejectedValue(new Error("socket secret detail"));
 
-    const result = await postPersonalTryOn({ ...input, retry: false, fetchImpl });
+    const result = await postPersonalTryOn({ ...input, action: "GENERATE", fetchImpl });
 
     expect(result).toEqual({ ok: false, errorCode: null });
   });

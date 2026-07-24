@@ -1,3 +1,5 @@
+import type { PersonalTryOnAction } from "./personal-try-on-service";
+
 export type PostPersonalTryOnResult =
   | { ok: true }
   | { ok: false; errorCode: string | null };
@@ -8,13 +10,15 @@ function extractErrorCode(body: unknown): string | null {
   return typeof code === "string" && code.length > 0 ? code : null;
 }
 
-// Sprint 3.9.1: the only client entry point for personal try-on generation.
+// Sprint 3.9.x: the only client entry point for personal try-on generation.
 // Never calls the legacy /try-on endpoint and never logs response payloads
-// (they may contain image URLs).
+// (they may contain image URLs). The action drives the service's exact-status
+// CAS: GENERATE → PENDING, RETRY_FAILED → FAILED, REGENERATE_COMPLETED →
+// COMPLETED.
 export async function postPersonalTryOn(input: {
   diagnosisId: string;
   recommendationId: string;
-  retry: boolean;
+  action: PersonalTryOnAction;
   fetchImpl?: typeof fetch;
 }): Promise<PostPersonalTryOnResult> {
   const fetchImpl = input.fetchImpl ?? fetch;
@@ -24,7 +28,7 @@ export async function postPersonalTryOn(input: {
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ retry: input.retry }),
+        body: JSON.stringify({ action: input.action }),
       }
     );
     const body: unknown = await response.json().catch(() => null);
