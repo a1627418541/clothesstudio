@@ -20,7 +20,7 @@ describe("evolinkPersonalTryOnProvider", () => {
     vi.unstubAllGlobals();
   });
 
-  it("sends prompt and reference images in fixed order", async () => {
+  it("sends prompt and reference images in fixed order via image_urls", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -39,17 +39,43 @@ describe("evolinkPersonalTryOnProvider", () => {
     expect(result.url).toBe("https://files.evolink.ai/result.png");
     expect(fetchMock).toHaveBeenCalledWith(
       "https://api.evolink.ai/v1/images/generations",
-      expect.objectContaining({
-        method: "POST",
-        body: JSON.stringify({
-          model: "gpt-image-2",
-          prompt: "test prompt",
-          n: 1,
-          size: "1024x1792",
-          image: ["https://signed.example/body.jpg", "https://signed.example/face.jpg"],
-        }),
-      })
+      expect.objectContaining({ method: "POST" })
     );
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body).toEqual({
+      model: "gpt-image-2",
+      prompt: "test prompt",
+      n: 1,
+      size: "1024x1792",
+      image_urls: ["https://signed.example/body.jpg", "https://signed.example/face.jpg"],
+    });
+    expect(body).not.toHaveProperty("image");
+    expect(body.image_urls).toHaveLength(2);
+    expect(
+      body.image_urls.every(
+        (value: unknown) => typeof value === "string" && value.length > 0
+      )
+    ).toBe(true);
+  });
+
+  it("never leaks input image URLs into error results", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: async () => ({ error: { message: "bad request" } }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await evolinkPersonalTryOnProvider.generate({
+      prompt: "test prompt",
+      fullBodyImage: "https://signed.example/body.jpg",
+      frontFaceImage: "https://signed.example/face.jpg",
+    });
+
+    expect(result.url).toBeNull();
+    expect(result.error).not.toContain("https://signed.example/body.jpg");
+    expect(result.error).not.toContain("https://signed.example/face.jpg");
+    expect(result.error).not.toContain("signed.example");
   });
 
   it("returns error when API key is missing", async () => {
