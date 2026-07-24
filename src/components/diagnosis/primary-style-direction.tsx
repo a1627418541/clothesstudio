@@ -41,7 +41,9 @@ export function PrimaryStyleDirection({
             title={recommendation.title}
             aspect="4/5"
           />
-          {personalTryOnView.kind === "completed" ? (
+          {personalTryOnView.kind === "completed" ||
+          personalTryOnView.kind === "regenerating" ||
+          personalTryOnView.kind === "regeneration_failed" ? (
             <div className="mt-4">
               <StylePreviewImage
                 status="COMPLETED"
@@ -49,7 +51,7 @@ export function PrimaryStyleDirection({
                 title={`${recommendation.title} 本人试穿`}
                 aspect="4/5"
                 disclosure={
-                  personalTryOnView.legacy
+                  personalTryOnView.kind === "completed" && personalTryOnView.legacy
                     ? LEGACY_TRY_ON_DISCLOSURE
                     : PERSONAL_TRY_ON_DISCLOSURE
                 }

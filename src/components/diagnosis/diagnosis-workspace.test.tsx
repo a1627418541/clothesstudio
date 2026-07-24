@@ -57,5 +57,7 @@ describe("diagnosis workspace", () => {
     expect(requestSource).toContain(
       "/recommendations/${input.recommendationId}/personal-try-on"
     );
+    expect(source).toContain('"REGENERATE_COMPLETED"');
+    expect(source).toContain('"RETRY_FAILED"');
   });
 });

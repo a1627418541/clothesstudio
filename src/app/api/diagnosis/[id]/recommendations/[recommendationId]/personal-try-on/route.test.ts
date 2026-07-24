@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   auth: vi.fn(),
   getAnonymousSessionByToken: vi.fn(),
   runPersonalTryOnGeneration: vi.fn(),
+  checkFullBodyImageSize: vi.fn(),
   prisma: {
     styleDiagnosis: {
       findUnique: vi.fn(),
@@ -23,6 +24,9 @@ vi.mock("@/lib/anonymous-session", () => ({
 vi.mock("@/lib/prisma", () => ({ prisma: mocks.prisma }));
 vi.mock("@/lib/personal-try-on/personal-try-on-service", () => ({
   runPersonalTryOnGeneration: mocks.runPersonalTryOnGeneration,
+}));
+vi.mock("@/lib/personal-try-on/full-body-image-check", () => ({
+  checkFullBodyImageSize: mocks.checkFullBodyImageSize,
 }));
 
 function makeRequest(cookie?: string) {
@@ -86,6 +90,7 @@ describe("POST /api/diagnosis/[id]/recommendations/[recommendationId]/personal-t
   beforeEach(() => {
     mocks.auth.mockResolvedValue(null);
     mocks.getAnonymousSessionByToken.mockResolvedValue(null);
+    mocks.checkFullBodyImageSize.mockResolvedValue({ ok: true });
     mocks.runPersonalTryOnGeneration.mockResolvedValue({
       status: "COMPLETED",
       generationId: "gen-1",
@@ -160,6 +165,66 @@ describe("POST /api/diagnosis/[id]/recommendations/[recommendationId]/personal-t
 
     expect(response.status).toBe(200);
     expect(mocks.runPersonalTryOnGeneration).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects undersized full-body photos before any provider work", async () => {
+    mocks.prisma.styleDiagnosis.findUnique.mockResolvedValue(passingDiagnosis());
+    mocks.getAnonymousSessionByToken.mockResolvedValue({ id: "anon-1" });
+    mocks.checkFullBodyImageSize.mockResolvedValue({
+      ok: false,
+      code: "FULL_BODY_IMAGE_TOO_SMALL",
+    });
+
+    const response = await POST(makeRequest("aps_anonymous_session=token"), { params });
+
+    expect(response.status).toBe(409);
+    const body = await response.json();
+    expect(body.error).toBe("FULL_BODY_IMAGE_TOO_SMALL");
+    expect(mocks.runPersonalTryOnGeneration).not.toHaveBeenCalled();
+  });
+
+  it("rejects an unknown action with 400 before any service work", async () => {
+    mocks.prisma.styleDiagnosis.findUnique.mockResolvedValue(passingDiagnosis());
+    mocks.getAnonymousSessionByToken.mockResolvedValue({ id: "anon-1" });
+
+    const response = await POST(
+      makeRequestWithBody({ action: "DO_A_BARREL_ROLL" }, "aps_anonymous_session=token"),
+      { params }
+    );
+
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error).toBe("INVALID_PERSONAL_TRY_ON_ACTION");
+    expect(mocks.runPersonalTryOnGeneration).not.toHaveBeenCalled();
+  });
+
+  it("forwards an explicit REGENERATE_COMPLETED action to the service", async () => {
+    mocks.prisma.styleDiagnosis.findUnique.mockResolvedValue(passingDiagnosis());
+    mocks.getAnonymousSessionByToken.mockResolvedValue({ id: "anon-1" });
+
+    const response = await POST(
+      makeRequestWithBody({ action: "REGENERATE_COMPLETED" }, "aps_anonymous_session=token"),
+      { params }
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.runPersonalTryOnGeneration).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "REGENERATE_COMPLETED" }),
+      expect.any(Object)
+    );
+  });
+
+  it("defaults to GENERATE when no body is provided", async () => {
+    mocks.prisma.styleDiagnosis.findUnique.mockResolvedValue(passingDiagnosis());
+    mocks.getAnonymousSessionByToken.mockResolvedValue({ id: "anon-1" });
+
+    const response = await POST(makeRequest("aps_anonymous_session=token"), { params });
+
+    expect(response.status).toBe(200);
+    expect(mocks.runPersonalTryOnGeneration).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "GENERATE" }),
+      expect.any(Object)
+    );
   });
 });
 

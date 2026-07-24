@@ -11,11 +11,17 @@ import { storeImageFromUrlOrBase64 } from "@/lib/r2-image-store";
 
 const MAX_ATTEMPTS = 3;
 
+export type PersonalTryOnAction =
+  | "GENERATE"
+  | "RETRY_FAILED"
+  | "REGENERATE_COMPLETED";
+
 export interface PersonalTryOnGenerationInput {
   diagnosisId: string;
   recommendationId: string;
   userId: string | null;
   anonymousSessionId: string | null;
+  action: PersonalTryOnAction;
   snapshot: ArchetypeRecommendationSnapshot;
   fullBody: { bucket: string; key: string };
   frontFace: { bucket: string; key: string };
@@ -25,6 +31,7 @@ export interface PersonalTryOnGenerationDependencies {
   provider: PersonalTryOnImageProvider & { name?: string };
   storeImage: typeof storeImageFromUrlOrBase64;
   buildImageInput: typeof buildProviderImageInput;
+  deleteObject?: (input: { key: string }) => Promise<void>;
   client: {
     personalTryOnGeneration: {
       findUnique(args: Prisma.PersonalTryOnGenerationFindUniqueArgs): Promise<PersonalTryOnGeneration | null>;
@@ -70,7 +77,11 @@ export async function runPersonalTryOnGeneration(
   });
 
   let generationId: string;
+  let previousObjectKey: string | null = null;
   if (!existing) {
+    if (input.action !== "GENERATE") {
+      return { status: "FAILED", error: "GENERATION_NOT_CLAIMABLE" };
+    }
     try {
       const created = await dependencies.client.personalTryOnGeneration.create({
         data: {
@@ -98,18 +109,31 @@ export async function runPersonalTryOnGeneration(
     if (existing.attemptCount >= MAX_ATTEMPTS) {
       return { status: "FAILED", error: "ATTEMPT_CAP_REACHED", generationId: existing.id };
     }
-    const expectedStatus = existing.status === "PENDING" ? "PENDING" : existing.status === "FAILED" ? "FAILED" : null;
-    if (!expectedStatus) {
+    // Exact-status CAS: each action claims exactly one expected status,
+    // never a list of statuses.
+    const expectedStatus =
+      input.action === "GENERATE"
+        ? "PENDING"
+        : input.action === "RETRY_FAILED"
+          ? "FAILED"
+          : "COMPLETED";
+    if (existing.status !== expectedStatus) {
       return { status: "FAILED", error: "GENERATION_NOT_CLAIMABLE", generationId: existing.id };
     }
     const claimed = await dependencies.client.personalTryOnGeneration.updateMany({
       where: { id: existing.id, status: expectedStatus },
-      data: { status: "PROCESSING", attemptCount: { increment: 1 } },
+      data: {
+        status: "PROCESSING",
+        attemptCount: { increment: 1 },
+        prompt,
+        promptCompilerVersion: PERSONAL_TRY_ON_COMPILER_VERSION,
+      },
     });
     if (claimed.count !== 1) {
       return { status: "FAILED", error: "GENERATION_ALREADY_CLAIMED", generationId: existing.id };
     }
     generationId = existing.id;
+    previousObjectKey = existing.imageObjectKey ?? null;
   }
 
   const providerName = dependencies.provider.name ?? "unknown";
@@ -147,16 +171,54 @@ export async function runPersonalTryOnGeneration(
     return { status: "FAILED", error: "PERSONAL_TRY_ON_STORAGE_FAILED", generationId };
   }
 
-  await dependencies.client.personalTryOnGeneration.update({
-    where: { id: generationId },
-    data: {
-      status: "COMPLETED",
-      imageUrl: stored.url,
-      imageObjectKey: key,
-      provider: providerName,
-      error: null,
-    },
-  });
+  try {
+    await dependencies.client.personalTryOnGeneration.update({
+      where: { id: generationId },
+      data: {
+        status: "COMPLETED",
+        imageUrl: stored.url,
+        imageObjectKey: key,
+        provider: providerName,
+        error: null,
+      },
+    });
+  } catch {
+    // Persist failed after the new object was stored: keep the previous
+    // image, never touch the old object, clean up the orphan new object,
+    // and do not re-call the provider.
+    if (dependencies.deleteObject) {
+      try {
+        await dependencies.deleteObject({ key });
+      } catch {
+        // best-effort orphan cleanup
+      }
+    }
+    try {
+      await dependencies.client.personalTryOnGeneration.update({
+        where: { id: generationId },
+        data: {
+          status: "FAILED",
+          error: "PERSONAL_TRY_ON_STORAGE_FAILED",
+          provider: providerName,
+        },
+      });
+    } catch {
+      // leave the row for manual inspection
+    }
+    return { status: "FAILED", error: "PERSONAL_TRY_ON_STORAGE_FAILED", generationId };
+  }
+
+  if (
+    dependencies.deleteObject &&
+    previousObjectKey &&
+    previousObjectKey !== key
+  ) {
+    try {
+      await dependencies.deleteObject({ key: previousObjectKey });
+    } catch {
+      // best-effort cleanup after a committed replacement
+    }
+  }
 
   return { status: "COMPLETED", generationId, imageUrl: stored.url };
 }

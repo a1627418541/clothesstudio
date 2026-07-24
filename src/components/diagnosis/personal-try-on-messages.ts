@@ -13,6 +13,10 @@ const PERSONAL_TRY_ON_ERROR_MESSAGES: Record<string, string> = {
   PERSONAL_TRY_ON_PROVIDER_FAILED: "生成服务暂时不可用，请稍后重试",
   PERSONAL_TRY_ON_STORAGE_FAILED: "图片保存失败，请稍后重试",
   PERSONAL_TRY_ON_REQUEST_FAILED: "系统繁忙，请稍后重试",
+  INVALID_PERSONAL_TRY_ON_ACTION: "请求参数异常，请刷新后重试。",
+  FULL_BODY_IMAGE_TOO_SMALL:
+    "全身照距离过远或清晰度不足。请上传人物占画面较大、头到脚完整可见的正面全身照。",
+  FULL_BODY_IMAGE_UNREADABLE: "全身照读取失败，请重新上传后再试。",
 };
 
 export function personalTryOnErrorMessage(

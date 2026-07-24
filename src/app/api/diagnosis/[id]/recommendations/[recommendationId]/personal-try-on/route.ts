@@ -3,7 +3,9 @@ import { auth } from "@/lib/auth";
 import { getAnonymousSessionByToken } from "@/lib/anonymous-session";
 import { prisma } from "@/lib/prisma";
 import { validateV2RecommendationSnapshot } from "@/lib/style-archetype/recommendation-snapshot";
-import { runPersonalTryOnGeneration } from "@/lib/personal-try-on/personal-try-on-service";
+import { runPersonalTryOnGeneration, PersonalTryOnAction } from "@/lib/personal-try-on/personal-try-on-service";
+import { deleteObjectFromR2 } from "@/lib/r2";
+import { checkFullBodyImageSize } from "@/lib/personal-try-on/full-body-image-check";
 import { evolinkPersonalTryOnProvider } from "@/lib/ai/evolink-personal-try-on-provider";
 import { mockPersonalTryOnProvider } from "@/lib/ai/mock-personal-try-on-provider";
 import { buildProviderImageInput } from "@/lib/personal-try-on/provider-image-input";
@@ -26,14 +28,30 @@ function getProvider() {
 export async function POST(request: NextRequest, { params }: RouteContext) {
   try {
     const { id, recommendationId } = await params;
-    // Clients may send an optional JSON body ({ retry: true }) to make FAILED
-    // regeneration explicit. Claim/retry semantics are enforced by the
-    // generation service's exact-status CAS, so the flag is informational
-    // and the body is only drained tolerantly.
+    // Clients send an optional JSON body with an explicit action. The service
+    // enforces exact-status CAS per action (GENERATE → PENDING, RETRY_FAILED
+    // → FAILED, REGENERATE_COMPLETED → COMPLETED); empty bodies default to
+    // GENERATE.
+    let action: PersonalTryOnAction = "GENERATE";
     try {
-      await request.json();
+      const body: unknown = await request.json();
+      if (body && typeof body === "object" && "action" in body) {
+        const candidate = (body as { action?: unknown }).action;
+        if (
+          candidate === "GENERATE" ||
+          candidate === "RETRY_FAILED" ||
+          candidate === "REGENERATE_COMPLETED"
+        ) {
+          action = candidate;
+        } else {
+          return NextResponse.json(
+            { error: "INVALID_PERSONAL_TRY_ON_ACTION" },
+            { status: 400 }
+          );
+        }
+      }
     } catch {
-      // Empty or non-JSON bodies are acceptable.
+      // Empty or non-JSON bodies default to GENERATE.
     }
     const session = await auth();
     const userId = session?.user?.id ?? null;
@@ -91,12 +109,23 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ error: "REQUIRED_PHOTOS_NOT_READY" }, { status: 409 });
     }
 
+    // Hard input gate: blocks only generation/regeneration. Report reads,
+    // existing image display, consent withdrawal, and retention are unaffected.
+    const fullBodyCheck = await checkFullBodyImageSize({
+      bucket: bodyPhoto.mediaAsset.bucket,
+      key: bodyPhoto.mediaAsset.key,
+    });
+    if (!fullBodyCheck.ok) {
+      return NextResponse.json({ error: fullBodyCheck.code }, { status: 409 });
+    }
+
     const result = await runPersonalTryOnGeneration(
       {
         diagnosisId: diagnosis.id,
         recommendationId: recommendation.id,
         userId: diagnosis.userId,
         anonymousSessionId: diagnosis.anonymousSessionId,
+        action,
         snapshot: snapshotValidation.snapshot,
         fullBody: { bucket: bodyPhoto.mediaAsset.bucket, key: bodyPhoto.mediaAsset.key },
         frontFace: { bucket: facePhoto.mediaAsset.bucket, key: facePhoto.mediaAsset.key },
@@ -105,6 +134,11 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
         provider: getProvider(),
         storeImage: storeImageFromUrlOrBase64,
         buildImageInput: buildProviderImageInput,
+        deleteObject: (input) =>
+          deleteObjectFromR2({
+            bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME!,
+            key: input.key,
+          }),
         client: prisma,
       }
     );

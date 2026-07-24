@@ -43,7 +43,7 @@ export const evolinkPersonalTryOnProvider: PersonalTryOnImageProvider = {
           prompt,
           n: 1,
           size,
-          image: [fullBodyImage, frontFaceImage],
+          image_urls: [fullBodyImage, frontFaceImage],
         }),
       });
 

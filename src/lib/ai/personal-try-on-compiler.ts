@@ -1,7 +1,7 @@
 import { ArchetypeRecommendationSnapshot } from "@/lib/style-archetype/v2-types";
 import { validateV2RecommendationSnapshot } from "@/lib/style-archetype/recommendation-snapshot";
 
-export const PERSONAL_TRY_ON_COMPILER_VERSION = 1 as const;
+export const PERSONAL_TRY_ON_COMPILER_VERSION = 2 as const;
 
 export interface PersonalTryOnPromptInput {
   snapshot: ArchetypeRecommendationSnapshot;
@@ -93,21 +93,32 @@ export function compilePersonalTryOnPrompt(
     "PERSONAL VIRTUAL TRY-ON SPECIFICATION",
     `Compiler version: ${compiled.compilerVersion}`,
     "",
+    "[REFERENCE ROLES]",
+    "- first reference image is the immutable base photograph",
+    "- edit this exact photograph and this exact person",
+    "- second reference image is facial identity reference only",
+    "",
     "[IDENTITY PRESERVATION]",
-    "- preserve identity",
-    "- preserve recognizable facial features",
+    "- do not create a new person",
+    "- do not replace the subject",
+    "- preserve ethnicity",
+    "- preserve recognizable facial structure",
     "- preserve hairstyle",
     "- preserve skin tone",
     "- preserve age",
-    "- preserve body proportions",
-    "- preserve pose where possible",
+    "- preserve exact height and body proportions",
+    "- preserve shoulder width, torso length and leg length",
+    "- preserve pose, camera angle, framing and background",
+    "- do not idealize or create a fashion-model body",
+    "- no taller, slimmer or more muscular transformation",
     "",
     "[EDIT SCOPE]",
-    "- replace clothing only",
-    "- replace footwear only if required by the style",
+    "- change clothing and footwear only",
+    "- no new sunglasses or unrelated accessories",
+    "- no editorial reposing",
+    "- no background replacement",
     "- no face reshaping",
     "- no identity change",
-    "- no unrelated accessories",
     "- no text",
     "- no logo",
     "",

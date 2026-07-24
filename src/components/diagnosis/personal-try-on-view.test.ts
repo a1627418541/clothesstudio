@@ -106,6 +106,40 @@ describe("resolvePersonalTryOnView", () => {
     ).toEqual({ kind: "cta" });
   });
 
+  it("returns regenerating when a generation is processing over a previous image", () => {
+    expect(
+      resolvePersonalTryOnView(
+        rec({
+          personalTryOn: {
+            status: "PROCESSING",
+            imageUrl: "https://r2.example/previous.png",
+            errorCode: null,
+            attemptCount: 2,
+          },
+        })
+      )
+    ).toEqual({ kind: "regenerating", imageUrl: "https://r2.example/previous.png" });
+  });
+
+  it("returns regeneration_failed with the previous image when a regeneration fails", () => {
+    expect(
+      resolvePersonalTryOnView(
+        rec({
+          personalTryOn: {
+            status: "FAILED",
+            imageUrl: "https://r2.example/previous.png",
+            errorCode: "PERSONAL_TRY_ON_PROVIDER_FAILED",
+            attemptCount: 2,
+          },
+        })
+      )
+    ).toEqual({
+      kind: "regeneration_failed",
+      errorCode: "PERSONAL_TRY_ON_PROVIDER_FAILED",
+      imageUrl: "https://r2.example/previous.png",
+    });
+  });
+
   it("returns unavailable for a legacy completed workflow without an image", () => {
     expect(resolvePersonalTryOnView(rec({ tryOnWorkflowStatus: "COMPLETED" }))).toEqual({
       kind: "unavailable",
